@@ -21,6 +21,4 @@ Imports:
   ChIPseeker,
   org.Hs.eg.db,
   TxDb.Hsapiens.UCSC.hg38.knownGene
-Remotes:
-Suggests:
 RoxygenNote: 6.1.1
