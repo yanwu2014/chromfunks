@@ -196,7 +196,7 @@ region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths,
   regions.conns.ix.vector <- as.character(regions.conns.ix@to)
   names(regions.conns.ix.vector) <- as.character(regions.conns.ix@from)
   regions.conns.ix.list <- UnflattenGroups(regions.conns.ix.vector)
-  names(regions.conns.ix.list) <- regions[[region.name]][as.integer(names(regions.conns.ix.list))]
+  names(regions.conns.ix.list) <- regions@elementMetadata[[region.name]][as.integer(names(regions.conns.ix.list))]
 
   ## Link HAR to a gene if the HAR is in the promoter region
   if (link.promoter) {
@@ -210,10 +210,10 @@ region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths,
       }
       w
     })
-    names(region.gene.weights.list) <- regions[[region.name]]
+    names(region.gene.weights.list) <- regions@elementMetadata[[region.name]]
   } else {
     region.gene.weights.list <- lapply(1:length(regions), function(i) { c() })
-    names(region.gene.weights.list) <- regions[[region.name]]
+    names(region.gene.weights.list) <- regions@elementMetadata[[region.name]]
   }
 
   ## Link coaccessibility
@@ -235,7 +235,7 @@ region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths,
 
   all.region.genes <- unique(unlist(lapply(region.gene.weights.list, names), F, F))
   region.gene.weights <- matrix(0, length(regions), length(all.region.genes))
-  rownames(region.gene.weights) <- regions[[region.name]]
+  rownames(region.gene.weights) <- regions@elementMetadata[[region.name]]
   colnames(region.gene.weights) <- all.region.genes
   for(h in names(region.gene.weights.list)) {
     region.gene.weights[h, names(region.gene.weights.list[[h]])] <- region.gene.weights.list[[h]]
