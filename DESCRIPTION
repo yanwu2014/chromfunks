@@ -1,7 +1,7 @@
 Package: chromfunks
 Type: Package
 Title: Functions for Analyzing Chromatin Accessibility Data
-Version: 0.1.0
+Version: 0.1.2
 Author: Yan Wu
 Maintainer: Yan Wu <yauwning@gmail.com>
 Description: A series of functions for computing differential accessibility and handling and overlapping GWAS data with chromatin accessibility peaks
@@ -10,6 +10,7 @@ Encoding: UTF-8
 LazyData: true
 Imports:
   Matrix,
+  SparseM,
   limma,
   reshape2,
   methods,

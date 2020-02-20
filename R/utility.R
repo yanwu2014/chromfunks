@@ -63,7 +63,7 @@ peak2df <- function(peak.names, keep.colnames = F, metadata.df = NULL) {
   if (!keep.colnames) {
     colnames(bed.df) <- NULL
   }
-  bed.df
+  bed.df[complete.cases(bed.df),]
 }
 
 
@@ -92,16 +92,9 @@ peak2granges <- function(peak.names, metadata.df = NULL) {
 #' @export
 #'
 invertList <- function(my.list) {
-  unique.items <- unique(unlist(my.list, F, F))
-  inv.list <- vector("list", length(unique.items))
-  names(inv.list) <- unique.items
-
-  for (key in names(my.list)) {
-    for (item in my.list[[key]]) {
-      inv.list[[item]] <- c(inv.list[[item]], key)
-    }
-  }
-  inv.list
+  x <- unlist(my.list, F, T)
+  a <- names(x); names(a) <- x;
+  split(unname(a),names(a))
 }
 
 

@@ -24,7 +24,8 @@ cluster_pheno_pvals <- function(pheno.blocks, top_diff_peaks, background_peaks,
   n_diff_peaks <- sapply(top_diff_peaks, length)
   cl <- snow::makeCluster(n.cores, type = "SOCK")
   invisible(snow::parLapply(cl, 1:n.cores, function(i) library(GenomicRanges)))
-  snow::clusterExport(cl, c("background_peaks", "cluster_pheno_scores", "n_diff_peaks"),
+  snow::clusterExport(cl, c("background_peaks", "cluster_pheno_scores", "n_diff_peaks",
+                            "pheno.blocks", "z.score"),
                       envir = environment())
   rand.scores <- snow::parLapply(cl, 1:n.rand, function(i) {
     idx.draw <- 1:length(background_peaks)
@@ -173,7 +174,7 @@ get_pheno_blocks <- function(sig.pheno.snps, snp.data, ld_blocks, chr.lengths, b
     tag.snps.gr.merged$snp <- tag.snps.gr[ii]$snp
 
     unique.snp.z <- tag.snps.gr.merged$z; names(unique.snp.z) <- tag.snps.gr.merged$snp;
-    unique.snps.gr <- get_snp_gr(tag.snps.z, snp.data, buffer.size, chr.lengths)
+    unique.snps.gr <- get_snp_gr(unique.snp.z, snp.data, buffer.size, chr.lengths)
 
     unique.snps.gr <- unique.snps.gr[order(unique.snps.gr$z, decreasing = T),]
     return(unique.snps.gr[1:min(length(unique.snps.gr), max.blocks)])
