@@ -94,7 +94,7 @@ region_overlap <- function(gr1, gr2, gr1.name = "HAR") {
 #'
 peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
                                promoter.region = c(-5000, 5000),
-                               anno.level = "gene") {
+                               anno.level = "transcript") {
   require(org.Hs.eg.db)
   require(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
@@ -180,7 +180,7 @@ peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
 #' @export
 #'
 region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths, link.promoter = F,
-                                 promoter.region = c(-5000, 5000), anno.level = "gene",
+                                 promoter.region = c(-5000, 5000), anno.level = "transcript",
                                  buffer.size = 1e3, region.name = "HAR") {
   require(org.Hs.eg.db)
   require(TxDb.Hsapiens.UCSC.hg38.knownGene)

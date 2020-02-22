@@ -11,7 +11,7 @@ region_gene_coaccess(
   hg38.chr.lengths,
   link.promoter = F,
   promoter.region = c(-5000, 5000),
-  anno.level = "gene",
+  anno.level = "transcript",
   buffer.size = 1000,
   region.name = "HAR"
 )

@@ -9,7 +9,7 @@ peak_gene_coaccess(
   conns,
   link.promoter = T,
   promoter.region = c(-5000, 5000),
-  anno.level = "gene"
+  anno.level = "transcript"
 )
 }
 \arguments{
