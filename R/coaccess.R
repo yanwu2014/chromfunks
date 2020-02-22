@@ -70,7 +70,7 @@ region_overlap <- function(gr1, gr2, gr1.name = "HAR") {
   names(overlap.ix.list) <- gr1@elementMetadata[[gr1.name]][as.integer(unique.groups)]
 
   lapply(overlap.ix.list, function(peaks.ix) {
-    peaks.gr[as.integer(peaks.ix)]
+    gr2[as.integer(peaks.ix)]
   })
 }
 
