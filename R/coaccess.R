@@ -82,6 +82,7 @@ region_overlap <- function(gr1, gr2, gr1.name = "HAR") {
 #' @param conns Dataframe of peak to peak coaccessibility
 #' @param link.promoter Include peaks in gene promoters
 #' @param promoter.region Specify the window around the TSS that counts as a promoter
+#' @param anno.level Specify "gene" or "transcript" for a gene/transcript level annotation
 #'
 #' @return Matrix of peak to gene coaccessibilities. A score of 1 means the peak is in the gene promoter.
 #'
@@ -92,13 +93,15 @@ region_overlap <- function(gr1, gr2, gr1.name = "HAR") {
 #' @export
 #'
 peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
-                               promoter.region = c(-5000, 5000)) {
+                               promoter.region = c(-5000, 5000),
+                               anno.level = "gene") {
   require(org.Hs.eg.db)
   require(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
   names(peaks.gr) <- paste0(seqnames(peaks.gr), ":", start(peaks.gr), "-", end(peaks.gr))
   peaks.gr.anno <- annotatePeak(peaks.gr, tssRegion = promoter.region,
                                 TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene,
+                                level = anno.level,
                                 annoDb = "org.Hs.eg.db")
   peaks.gr.anno <- as.data.frame(peaks.gr.anno)
   rownames(peaks.gr.anno) <- names(peaks.gr)
@@ -164,7 +167,9 @@ peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
 #' @param hg38.chr.lengths Chromosome lengths
 #' @param link.promoter Include peaks in gene promoters
 #' @param promoter.region Specify the window around the TSS that counts as a promoter
-#' @param buffer.size
+#' @param anno.level Specify "gene" or "transcript" for a gene/transcript level annotation
+#' @param buffer.size Buffer size around each region
+#' @param region.name Name of region identifier
 #'
 #' @return Matrix of region to gene coaccessibilities. A score of 1 means the region is in the gene promoter.
 #'
@@ -175,7 +180,8 @@ peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
 #' @export
 #'
 region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths, link.promoter = F,
-                                 promoter.region = c(-5000, 5000), buffer.size = 1e3, region.name = "HAR") {
+                                 promoter.region = c(-5000, 5000), anno.level = "gene",
+                                 buffer.size = 1e3, region.name = "HAR") {
   require(org.Hs.eg.db)
   require(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
@@ -188,6 +194,7 @@ region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths,
 
   conns.to.gr <- peak2granges(conns$Peak2)
   conns.to.gr.anno <- annotatePeak(conns.to.gr, tssRegion = promoter.region,
+                                   level = anno.level,
                                    TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene,
                                    annoDb = "org.Hs.eg.db")
   conns.to.gr.anno <- conns.to.gr.anno@anno
