@@ -8,7 +8,7 @@
 #' @param min.p Minimum p-value possible
 #'
 #' @return List of dataframes with cluster specificity, logfc, and p-value for each site tested
-#' @import sparseM
+#' @import SparseM
 #' @export
 #'
 find_all_diff <- function(counts, clusters, min.p = 1e-100) {

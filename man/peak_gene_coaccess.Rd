@@ -4,8 +4,13 @@
 \alias{peak_gene_coaccess}
 \title{Compute relationship between peaks and genes using coaccessibility/promoters}
 \usage{
-peak_gene_coaccess(peaks.gr, conns, link.promoter = T,
-  promoter.region = c(-5000, 5000))
+peak_gene_coaccess(
+  peaks.gr,
+  conns,
+  link.promoter = T,
+  promoter.region = c(-5000, 5000),
+  anno.level = "gene"
+)
 }
 \arguments{
 \item{peaks.gr}{Peaks in granges format}
@@ -15,6 +20,8 @@ peak_gene_coaccess(peaks.gr, conns, link.promoter = T,
 \item{link.promoter}{Include peaks in gene promoters}
 
 \item{promoter.region}{Specify the window around the TSS that counts as a promoter}
+
+\item{anno.level}{Specify "gene" or "transcript" for a gene/transcript level annotation}
 }
 \value{
 Matrix of peak to gene coaccessibilities. A score of 1 means the peak is in the gene promoter.

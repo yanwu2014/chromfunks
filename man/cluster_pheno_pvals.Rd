@@ -4,8 +4,14 @@
 \alias{cluster_pheno_pvals}
 \title{Calculate p-values linking phenotypes to clusters using permutation testing}
 \usage{
-cluster_pheno_pvals(pheno.blocks, top_diff_peaks, background_peaks,
-  n.rand = 10000, n.cores = 8, z.score = T)
+cluster_pheno_pvals(
+  pheno.blocks,
+  top_diff_peaks,
+  background_peaks,
+  n.rand = 10000,
+  n.cores = 8,
+  z.score = T
+)
 }
 \arguments{
 \item{pheno.blocks}{A list of genomic regions for each GWAS phenotype in granges format}

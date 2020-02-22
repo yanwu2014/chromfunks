@@ -4,8 +4,15 @@
 \alias{get_pheno_blocks}
 \title{Compute blocks for each GWAS phenotype by finding the tag snp for in each LD block and extending by the buffer size}
 \usage{
-get_pheno_blocks(sig.pheno.snps, snp.data, ld_blocks, chr.lengths,
-  buffer.size = 20000, max.block.size = Inf, max.blocks = Inf)
+get_pheno_blocks(
+  sig.pheno.snps,
+  snp.data,
+  ld_blocks,
+  chr.lengths,
+  buffer.size = 20000,
+  max.block.size = Inf,
+  max.blocks = Inf
+)
 }
 \arguments{
 \item{sig.pheno.snps}{List of SNPs for each GWAS phenotype that pass the p-value threshold}

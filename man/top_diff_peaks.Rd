@@ -4,8 +4,13 @@
 \alias{top_diff_peaks}
 \title{Find top differentially accessible peaks for each cluster}
 \usage{
-top_diff_peaks(diff_peaks_list, qval.cutoff = 0.05,
-  specificity.cutoff = 1e-04, logfc.cutoff = 0.5, max.peaks = 20000)
+top_diff_peaks(
+  diff_peaks_list,
+  qval.cutoff = 0.05,
+  specificity.cutoff = 1e-04,
+  logfc.cutoff = 0.5,
+  max.peaks = 20000
+)
 }
 \arguments{
 \item{diff_peaks_list}{List of dA peaks per cluster output by find_all_diff}

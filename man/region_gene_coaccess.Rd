@@ -4,9 +4,17 @@
 \alias{region_gene_coaccess}
 \title{Compute relationship between arbitrary and genes using coaccessibility between peaks/promoters}
 \usage{
-region_gene_coaccess(regions, regions.anno, conns, hg38.chr.lengths,
-  link.promoter = F, promoter.region = c(-5000, 5000),
-  buffer.size = 1000, region.name = "HAR")
+region_gene_coaccess(
+  regions,
+  regions.anno,
+  conns,
+  hg38.chr.lengths,
+  link.promoter = F,
+  promoter.region = c(-5000, 5000),
+  anno.level = "gene",
+  buffer.size = 1000,
+  region.name = "HAR"
+)
 }
 \arguments{
 \item{regions}{Genomic regions in granges format}
@@ -21,7 +29,11 @@ region_gene_coaccess(regions, regions.anno, conns, hg38.chr.lengths,
 
 \item{promoter.region}{Specify the window around the TSS that counts as a promoter}
 
-\item{buffer.size}{}
+\item{anno.level}{Specify "gene" or "transcript" for a gene/transcript level annotation}
+
+\item{buffer.size}{Buffer size around each region}
+
+\item{region.name}{Name of region identifier}
 }
 \value{
 Matrix of region to gene coaccessibilities. A score of 1 means the region is in the gene promoter.
