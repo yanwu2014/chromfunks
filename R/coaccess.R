@@ -56,21 +56,21 @@ filter_conns <- function(conns, min.coaccess) {
 region_overlap <- function(gr1, gr2, gr1.name = "HAR") {
   overlap.ix <- findOverlaps(gr1, gr2)
 
-  overlap.ix.vector <- as.character(overlap.ix@to)
-  names(overlap.ix.vector) <- as.character(overlap.ix@from)
+  overlap.ix.vector <- as.character(overlap.ix@from)
+  names(overlap.ix.vector) <- as.character(overlap.ix@to)
 
-  unique.groups <- unique(overlap.ix.vector)
-  overlap.ix.list <- vector(mode = "list", length = length(unique.groups))
-  names(overlap.ix.list) <- unique.groups
+  unique.gr1 <- unique(overlap.ix.vector)
+  overlap.ix.list <- vector(mode = "list", length = length(unique.gr1))
+  names(overlap.ix.list) <- unique.gr1
 
-  for (g in unique.groups) {
-    g.cells <- names(overlap.ix.vector[overlap.ix.vector == g])
-    overlap.ix.list[[g]] <- g.cells
+  for (g in unique.gr1) {
+    gr2.ix <- names(overlap.ix.vector[overlap.ix.vector == g])
+    overlap.ix.list[[g]] <- gr2.ix
   }
-  names(overlap.ix.list) <- gr1@elementMetadata[[gr1.name]][as.integer(unique.groups)]
+  names(overlap.ix.list) <- gr1@elementMetadata[[gr1.name]][as.integer(unique.gr1)]
 
-  lapply(overlap.ix.list, function(peaks.ix) {
-    gr2[as.integer(peaks.ix)]
+  lapply(overlap.ix.list, function(gr2.ix) {
+    gr2[as.integer(gr2.ix)]
   })
 }
 
