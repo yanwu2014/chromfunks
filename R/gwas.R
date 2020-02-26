@@ -266,15 +266,17 @@ filter_snps <- function(pheno.snp.list, p.cutoff, max.snps = Inf, min.snps = 1) 
 #' Download SNP data from dbSNP using biomaRt
 #'
 #' @param snps Vector of SNP rsIDs
+#' @param host ENSEMBL mirror to use (default US west server)
 #'
 #' @return Dataframe with the genomic location of each SNP (in hg38 coordinates)
 #'
 #' @import biomaRt
 #' @export
 #'
-get_snp_data <- function(snps) {
+get_snp_data <- function(snps, host = "http://uswest.ensembl.org/") {
   require(biomaRt)
-  snp_mart = useMart("ENSEMBL_MART_SNP", dataset = "hsapiens_snp")
+  snp_mart = useMart("ENSEMBL_MART_SNP", host = host,
+                     dataset = "hsapiens_snp")
 
   snp_attributes = c("refsnp_id", "chr_name", "chrom_start")
   snp.df <- getBM(attributes = snp_attributes, filters = "snp_filter",

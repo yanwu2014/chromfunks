@@ -4,10 +4,12 @@
 \alias{get_snp_data}
 \title{Download SNP data from dbSNP using biomaRt}
 \usage{
-get_snp_data(snps)
+get_snp_data(snps, host = "http://uswest.ensembl.org/")
 }
 \arguments{
 \item{snps}{Vector of SNP rsIDs}
+
+\item{host}{ENSEMBL mirror to use (default US west server)}
 }
 \value{
 Dataframe with the genomic location of each SNP (in hg38 coordinates)
