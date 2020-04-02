@@ -140,12 +140,12 @@ get_pheno_blocks <- function(sig.pheno.snps, snp.data, ld_blocks, chr.lengths, b
 
   ## Split blocks
   blocks.granges <- peak2granges(names(block2snp))
-  blocks.split <- names(blocks.granges)[width(blocks.granges) > max.block.size]
-  for (bl in blocks.split) {
-    bl.snps.gr <- block2snp[[bl]]; block2snp[[bl]] <- NULL;
-    block2snp <- c(block2snp, split_block(bl.snps.gr, chr.lengths, buffer.size))
-  }
-  blocks.granges <- peak2granges(names(block2snp))
+  # blocks.split <- names(blocks.granges)[width(blocks.granges) > max.block.size]
+  # for (bl in blocks.split) {
+  #   bl.snps.gr <- block2snp[[bl]]; block2snp[[bl]] <- NULL;
+  #   block2snp <- c(block2snp, split_block(bl.snps.gr, chr.lengths, buffer.size))
+  # }
+  # blocks.granges <- peak2granges(names(block2snp))
 
   print(paste0("Median block width: ", median(width(blocks.granges))))
   print(paste0("Mean block width: ", mean(width(blocks.granges))))
@@ -158,14 +158,20 @@ get_pheno_blocks <- function(sig.pheno.snps, snp.data, ld_blocks, chr.lengths, b
     ## Keep the most significant tag snp for each LD block
     block.z <- z[names(z) %in% names(snp2block)]
     block.names <- factor(snp2block[names(block.z)])
+
+    ## We're going to need to construct sub-blocks within each block instead of just taking the max snp
     block.tag.z <- z[tapply(block.z, block.names, function(x) names(x)[which.max(x)])]
 
+    ## We're also going to need to figure out how to deal with SNPs that don't fall in existing blocks
     single.tag.z <- z[!names(z) %in% names(snp2block)]
     single.tag.z <- single.tag.z[names(single.tag.z) %in% snp.data$snp]
     stopifnot(length(intersect(names(single.tag.z), names(block.tag.z))) == 0)
 
     ## Extend SNP boundaries and keep the most significant SNP for any overlapping SNPs
     tag.snps.z <- c(block.tag.z, single.tag.z)
+
+    ## get_snp_gr is a very useful function for generating a snp with a buffer
+    ## We're most likely going to want to build a function for generating a sub-block for overlapping SNPs
     tag.snps.gr <- get_snp_gr(tag.snps.z, snp.data, buffer.size, chr.lengths)
     tag.snps.gr.merged <- reduce(tag.snps.gr, with.revmap = T)
 
