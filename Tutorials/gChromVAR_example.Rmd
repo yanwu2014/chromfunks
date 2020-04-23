@@ -1,0 +1,256 @@
+---
+title: "gChromVAR_Example"
+author: "Yan Wu"
+date: "4/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(bitmapType="cairo")
+```
+
+
+gChromVAR is a tool that enables us to link cell types (and in some cases individual cells) to GWAS traits.
+However, for each GWAS trait, gChromVAR requires that for each trait, we first compute the probability that any given
+SNP is truly causal for that trait. Luckily there is a database that already has those probabilities computed
+for most traits of interest: http://mulinlab.org/causaldb/index.html. I've downloaded the contents of this database
+to NAS1 for easy access
+```{r}
+db.path <- "/media/NAS1/Yan/CausalDB/credible_set/"
+```
+
+
+We next need to specify the traits we're interested. To find traits relevant to your dataset, you can use
+the database search function, just switch the search from "variant" to "trait". Look for what the database
+calls the "MeSH Term". Since we're dealing with the motor cortex dataset, we used terms related to 
+neurological traits.
+```{r}
+traits <- c("Multiple Sclerosis", 
+            "Autism Spectrum Disorder",
+            "Amyotrophic Lateral Sclerosis",
+            "Schizophrenia",
+            "Alzheimer Disease", 
+            "Attention Deficit Disorder with Hyperactivity",
+            "Depression",
+            "Bipolar Disorder",
+            "Anxiety Disorders",
+            "Adjustment Disorders",
+            "Memory",
+            "Cognition",
+            "Mood Disorders",
+            "Neuroticism",
+            "Risk-Taking")
+```
+
+
+Load the CausalDB metadata that will enable us to find the bed files associated with each trait
+```{r}
+causaldb.meta <- read.table("/media/NAS1/Yan/CausalDB/causaldb_meta_info_v1.txt", sep = "\t", 
+                            header = T, stringsAsFactors = FALSE,
+                            quote = "", fill = NA)
+```
+
+
+Here we're going to find all of the GWAS studies that correspond to our MeSH term traits
+```{r}
+causaldb.traits <- subset(causaldb.meta, MeSH_term %in% traits)
+head(causaldb.traits)
+```
+
+
+Now you can either pick the study that you prefer by manually selecting the rows of this dataframe.
+Here we'll pick the study with the largest number of causal blocks and significant SNPs.
+```{r}
+causaldb.traits <- causaldb.traits[order(causaldb.traits$N_Causal_blocks, decreasing = T),]
+causaldb.traits <- causaldb.traits[order(causaldb.traits$N_Pval..5e.8, decreasing = T),]
+# causaldb.traits <- causaldb.traits[order(causaldb.traits$Case, decreasing = T),]
+causaldb.traits <- Reduce(rbind, by(causaldb.traits, causaldb.traits$MeSH_term, head, n = 1))
+```
+
+
+We get the paths to all of the causal SNP files for each study we choose to include
+```{r}
+col.mapping <- c("CHR" = "chr", "BP" = "start")
+trait.paths <- paste0(db.path, causaldb.traits$ID, "_total_credible_set.txt")
+```      
+
+
+We load the causal SNP data as GenomicRanges objects
+```{r, message=FALSE, warning=FALSE}
+library(GenomicRanges)
+
+trait.grs <- lapply(trait.paths, function(path) {
+  df <- read.table(path, sep = "\t", header = T)
+  colnames(df) <- plyr::revalue(colnames(df), replace = col.mapping)
+  df$stop <- df$start + 1
+  df$block_id <- paste0("region", df$block_id)
+  df <- df[,c("chr", "start", "stop", "block_id", "FINEMAP")]
+  
+  gr <- makeGRangesFromDataFrame(df, keep.extra.columns = T)
+  seqlevelsStyle(gr) <- "UCSC"
+  gr
+})
+names(trait.grs) <- gsub(" ", "_", causaldb.traits$MeSH_term)
+```
+
+
+Since most of our accessibility data is mapped to hg38, and CausalDB is in hg19, we need to liftover the
+CausalDB SNPs to hg38
+```{r, message=FALSE, warning=FALSE}
+library(rtracklayer)
+ch <- import.chain("/media/Scratch_SSD/Yan/R_Analysis/misc/GWAS/Chains/hg19ToHg38.over.chain")
+trait.grs.hg38 <- lapply(trait.grs, function(gr) unlist(liftOver(gr, ch)))
+```
+
+
+Finally we'll format the CausalDB traits in a format the gChromVAR requires and output them in a directory called
+`CausalDB_Sumstats/`.
+```{r}
+dir.create("CausalDB_Sumstats/")
+
+for(tr in names(trait.grs.hg38)) {
+  out.df <- as.data.frame(trait.grs.hg38[[tr]])
+  out.df <- out.df[,c("seqnames", "start", "end", "block_id", "FINEMAP")]
+  out.df <- subset(out.df, FINEMAP > 0.001)
+  
+  out.file <- paste0("CausalDB_Sumstats/", tr, ".bed")
+  write.table(out.df, file = out.file, sep = "\t", col.names = F, row.names = F, quote = F)
+}
+```
+
+
+Next, we'll run gChromVAR on a sample motor cortex dataset. First we'll need to install the latest version of
+a couple packages
+```{r}
+# BiocManager::install("chromVAR")
+# BiocManager::install("SummarizedExperiment")
+# BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")
+# devtools::install_github("caleblareau/gchromVAR")
+# devtools::install_github("caleblareau/BuenColors")
+# devtools::install_github("yanwu2014/swne")
+```
+
+
+We'll load all of our installed libraries
+```{r message=FALSE, warning=FALSE}
+library(chromVAR)
+library(gchromVAR)
+library(BuenColors)
+library(SummarizedExperiment)
+library(data.table)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(Matrix)
+library(swne)
+```
+
+
+Here we'll define a function for making a "pseudobulk" matrix where we'll collapse all of the fragments across
+all cells in a cluster into a single column. We've found that running gChromVAR at this cluster level is much
+faster and also gives better signal.
+```{r}
+getPseudobulk <- function(mat, celltype) {
+  mat.summary <- do.call(cbind, lapply(levels(celltype), function(ct) {
+    cells <- names(celltype)[celltype == ct]
+    pseudobulk <- rowSums(mat[,cells])
+    return(pseudobulk)
+  }))
+  colnames(mat.summary) <- levels(celltype)
+  return(mat.summary)
+}
+```
+
+
+
+Next we'll load the motor cortex accessibility counts matrix which will load the objects `atac.counts` and
+the peaks (in GenomicRanges format) as `MOp.peaks.gr`
+```{r}
+load("MOp.atac.counts.RData")
+dim(atac.counts)
+```
+
+
+And the motor cortex cluster definitions
+```{r}
+metadata <- read.table("MOp.example.metadata.txt", header = T, sep = "\t")
+clusters <- factor(metadata$cluster)
+names(clusters) <- metadata$cell
+table(clusters)
+```
+
+
+We'll collapse all the cells in each cluster to make a pseudobulk matrix and also clean up the single cell atac
+matrix to save memory
+```{r}
+counts <- getPseudobulk(atac.counts[,names(clusters)], clusters)
+dim(counts)
+
+## Clean up workspace to save memory
+rm(atac.counts)
+gc()
+```
+
+Now we'll filter the counts matrix to make sure there are no peaks with no accessible sites
+```{r}
+counts <- counts[Matrix::rowSums(counts) > 1,]
+MOp.peaks.gr <- MOp.peaks.gr[rownames(counts)]
+dim(counts)
+```
+
+Make a summarized experiment object
+```{r}
+SE <- SummarizedExperiment(assays = list(counts = counts),
+                           rowData = MOp.peaks.gr, 
+                           colData = DataFrame(names = colnames(counts)))
+SE <- addGCBias(SE, genome = BSgenome.Hsapiens.UCSC.hg38)
+```
+
+
+Import the causal SNP probability data from CausalDB
+```{r}
+files <- list.files(path = "CausalDB_Sumstats/", full.names = T)
+traits <- importBedScore(rowRanges(SE), files, colidx = 5)
+```
+
+
+Now we'll compute the enrichment of each GWAS trait in each cluster. Since gChromVAR is somewhat random, we'll
+compute multiple runs and average them. Typically we'll compute at least 50 runs but here we'll do 5 for the sake of
+speed.
+```{r}
+n.runs <- 5
+wDEV_list <- lapply(1:n.runs, function(i) {
+  wDEV <- computeWeightedDeviations(SE, traits)
+  assays(wDEV)[["z"]]
+})
+```
+
+
+Now we'll average the gChromVAR results from each run
+```{r}
+gdev.mat <- apply(abind::abind(wDEV_list, along = 3), c(1,2), function(x) {
+  mean(x[!(is.na(x) | is.nan(x))])
+})
+dim(gdev.mat)
+```
+
+
+Let's filter out any traits that don't show any signal at all in our data
+```{r}
+gdev.mat <- gdev.mat[apply(gdev.mat, 1, function(x) !any(is.na(x))),]
+gdev.mat <- gdev.mat[rowSums(abs(gdev.mat)) > 0,]
+```
+
+
+We'll highlight trait/cluster Z-scores greater than 2 (about equivalent to a p-value of 0.05)
+```{r}
+dot.highlight.cutoff <- 2
+```
+
+
+Finally we'll plot the heatmap of cluster/trait z-scores. Trait/cluster pairs highlighted with a dot are those
+with z-scores above the cutoff
+```{r}
+ggHeat(gdev.mat, heatscale = c(low = 'deepskyblue', mid = 'white', high = 'magenta'),
+       x.lab.size = 11, y.lab.size = 11, clustering = "row",
+       dot.highlight.cutoff = dot.highlight.cutoff)
+```

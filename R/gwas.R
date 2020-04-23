@@ -121,8 +121,8 @@ get_pheno_blocks <- function(sig.pheno.snps, snp.data, ld_blocks, chr.lengths, b
   snp.granges <- GenomicRanges::makeGRangesFromDataFrame(snp.data, keep.extra.columns = T)
 
   if (is.null(ld_blocks)) {
-    snp.granges.extended <- GenomicRanges::extend_gr(snp.granges, buffer = buffer.size,
-                                                     chr.lengths = chr.lengths)
+    snp.granges.extended <- extend_gr(snp.granges, buffer = buffer.size,
+                                      chr.lengths = chr.lengths)
     snp.granges.merged <- reduce(snp.granges.extended, with.revmap = T)
     block2snp <- lapply(1:length(snp.granges.merged), function(i) {
       jj <- snp.granges.merged[i]$revmap[[1]]
@@ -284,7 +284,7 @@ get_snp_data <- function(snps, host = "http://uswest.ensembl.org/") {
   snp_mart = useMart("ENSEMBL_MART_SNP", host = host,
                      dataset = "hsapiens_snp")
 
-  snp_attributes = c("refsnp_id", "chr_name", "chrom_start")
+  snp_attributes = c("refsnp_id", "chr_name", "chrom_start", "minor_allele_freq")
   snp.df <- getBM(attributes = snp_attributes, filters = "snp_filter",
                   values = snps, mart = snp_mart)
   colnames(snp.df) <- c("snp", "chr", "start")
