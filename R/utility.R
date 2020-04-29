@@ -146,3 +146,39 @@ formatCisTopicPeaks <- function(peak.names) {
   loc_end <- sapply(peak.names, function(x) strsplit(x, split = "_")[[1]][[3]])
   paste0(chrom, ":", loc_start,"-",loc_end)
 }
+
+
+#' Reformat rownames
+#'
+#' @param m Dense matrix
+#'
+#' @return The same matrix in dataframe format
+#' @export
+#'
+FlattenMatrix <- function(m) {
+  rows = dim(m)[1]
+  cols = dim(m)[2]
+  cbind(rowInd = rep(1:rows, times = cols),
+        colInd = rep(1:cols, each = rows),
+        reshape2::melt(m))
+}
+
+
+
+#' Helper function for generating a pseudo-bulk matrix
+#'
+#' @param mat Input single cell matrix
+#' @param celltype Cell type anotations
+#'
+#' @return A pseudo-bulk matrix where the columns have been summed by cell type
+#' @export
+#'
+getPseudobulk <- function(mat, celltype) {
+  mat.summary <- do.call(cbind, lapply(levels(celltype), function(ct) {
+    cells <- names(celltype)[celltype == ct]
+    pseudobulk <- rowSums(mat[,cells])
+    return(pseudobulk)
+  }))
+  colnames(mat.summary) <- levels(celltype)
+  return(mat.summary)
+}

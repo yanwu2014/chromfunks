@@ -1,10 +1,10 @@
 Package: chromfunks
 Type: Package
 Title: Functions for Analyzing Chromatin Accessibility Data
-Version: 0.1.6
+Version: 0.2.0
 Author: Yan Wu
 Maintainer: Yan Wu <yauwning@gmail.com>
-Description: A series of functions for computing differential accessibility and handling and overlapping GWAS data with chromatin accessibility peaks
+Description: A series of functions to help with integrating GWAS results with chromatin accessibility peaks
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
@@ -18,8 +18,10 @@ Imports:
   SparseM,
   GenomicRanges,
   abind,
-  biomaRt,
   ChIPseeker,
   org.Hs.eg.db,
-  TxDb.Hsapiens.UCSC.hg38.knownGene
-RoxygenNote: 7.0.2
+  TxDb.Hsapiens.UCSC.hg38.knownGene,
+  SummarizedExperiment
+Suggests:
+  gchromVAR
+RoxygenNote: 7.1.0
