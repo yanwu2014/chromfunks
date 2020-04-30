@@ -171,12 +171,14 @@ FlattenMatrix <- function(m) {
 #' @param celltype Cell type anotations
 #'
 #' @return A pseudo-bulk matrix where the columns have been summed by cell type
+#'
+#' @import Matrix
 #' @export
 #'
 getPseudobulk <- function(mat, celltype) {
   mat.summary <- do.call(cbind, lapply(levels(celltype), function(ct) {
     cells <- names(celltype)[celltype == ct]
-    pseudobulk <- rowSums(mat[,cells])
+    pseudobulk <- Matrix::rowSums(mat[,cells])
     return(pseudobulk)
   }))
   colnames(mat.summary) <- levels(celltype)
