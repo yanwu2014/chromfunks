@@ -53,7 +53,7 @@ FindCausalPeaks <- function(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.0
   stopifnot(all(rownames(traits) == rownames(SE)))
 
   ## Get overlap of each peak with SNPs from each trait
-  trait.scores <- traits@assays@data$weights
+  trait.scores <- assay(traits, "weights")
   rownames(trait.scores) <- rownames(traits)
 
   ## Find peaks overlapping with causal SNPs for each trait
@@ -65,7 +65,7 @@ FindCausalPeaks <- function(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.0
   causal.peaks <- causal.peaks[sapply(causal.peaks, length) > 0]
 
   ## Compute expected counts
-  counts <- SE@assays@data$counts
+  counts <- assay(SE, "counts")
   cluster.sums <- colSums(counts)
   peak.frac <- computeExpectations(SE)
   expected.counts <- sapply(cluster.sums, function(x) x*peak.frac)
