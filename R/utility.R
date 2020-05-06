@@ -184,3 +184,27 @@ getPseudobulk <- function(mat, celltype) {
   colnames(mat.summary) <- levels(celltype)
   return(mat.summary)
 }
+
+
+
+#' Compute deviations on a ATAC counts matrix
+#' @param counts Bulk or pseudo-bulk ATAC counts matrix
+#'
+#' @return A matrix of deviations from the expected counts
+#' @export
+#'
+getBulkDev <- function(counts) {
+  require(SummarizedExperiment)
+  require(chromVAR)
+
+  cluster.sums <- colSums(counts)
+  peaks <- peak2granges(rownames(counts))
+  SE <- SummarizedExperiment(assays = list(counts = counts),
+                             rowData = peaks,
+                             colData = data.frame(Name = colnames(counts)))
+  peak.frac <- computeExpectations(SE)
+  expected.counts <- sapply(cluster.sums, function(x) x*peak.frac)
+
+  ## Compute deviation from expected counts
+  (counts - expected.counts)/expected.counts
+}

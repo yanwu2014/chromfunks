@@ -1,17 +1,18 @@
 ## Functions for computing differentially accessible sites/peaks. Adapted from Trapnell lab code
 
 
-#' Find differentially accessible peaks/genes for each cluster
+#' Compute differentially accessible peaks for each cluster
 #'
 #' @param counts Binary accessibility matrix (peaks x cells)
 #' @param clusters Cluster assignments encoded as a factor
 #' @param min.p Minimum p-value possible
 #'
-#' @return List of dataframes with cluster specificity, logfc, and p-value for each site tested
+#' @return List of dataframes with cluster specificity, logfc, fraction accessible,
+#'         deviation from expected accessibility, and p-value for each site tested
 #' @import SparseM
 #' @export
 #'
-find_all_diff <- function(counts, clusters, min.p = 1e-100) {
+CalcDiffAccess <- function(counts, clusters, min.p = 1e-100) {
   stopifnot(length(clusters) == ncol(counts))
   clusters <- factor(clusters[!is.na(clusters)])
   if (!is.null(names(clusters))) {
@@ -19,6 +20,9 @@ find_all_diff <- function(counts, clusters, min.p = 1e-100) {
   } else {
     counts <- counts[,!is.na(clusters)]
   }
+
+  ## Binarize counts
+  counts@x[counts@x > 1] <- 1
 
   ## Calculate p-values with Fisher's exact test
   site.p <- calc_site_phyper(counts, clusters)
@@ -36,15 +40,23 @@ find_all_diff <- function(counts, clusters, min.p = 1e-100) {
 
   site.spec <- calc_site_specificity(site.prop, cl.depth)
 
+  ## Compute pseudo-bulk deviations for each cluster
+  bulk.counts <- getPseudobulk(counts, clusters)
+  dev <- getBulkDev(bulk.counts)
+
   ## Add logfc and specificity to differential accessibility results
   diff_peaks_list <- lapply(levels(clusters), function(cl) {
     p <- site.p[,cl]
     q <- site.q[,cl]
     logfc <- site.logfc[,cl]
+    dev <- dev[,cl]
+    prop <- site.prop[,cl]
     specificity <- site.spec[, cl]
-    df <- data.frame(pval = p, qval = q, logfc = logfc, specificity = specificity)
+    df <- data.frame(pval = p, qval = q, logfc = logfc, specificity = specificity,
+                     prop = prop, dev = dev)
     rownames(df) <- rownames(counts)
-    df
+    df <- df[order(df$dev, decreasing = T),]
+    df[order(df$pval),]
   })
   names(diff_peaks_list) <- levels(clusters)
 
@@ -52,10 +64,34 @@ find_all_diff <- function(counts, clusters, min.p = 1e-100) {
 }
 
 
-
-#' Find top differentially accessible peaks for each cluster
+#' @title find_all_diff
+#' @description Find differentially accessible peaks/genes for each cluster
+#' @param counts Binary accessibility matrix (peaks x cells)
+#' @param clusters Cluster assignments encoded as a factor
+#' @param min.p Minimum p-value possible
+#' @return List of dataframes with cluster specificity, logfc, and p-value for each site tested
 #'
-#' @param diff_peaks_list List of dA peaks per cluster output by find_all_diff
+#' @name find_all_diff-deprecated
+#' @seealso \code{\link{chromfunks-deprecated}}
+#' @keywords internal
+NULL
+
+#' @rdname chromfunks-deprecated
+#' @section \code{find_all_diff}:
+#' For \code{find_all_diff}, use \code{\link{CalcDiffAccess}}.
+#'
+#' @export
+#'
+find_all_diff <- function(counts, clusters, min.p = 1e-100) {
+  .Deprecated("CalcDiffAccess")
+  CalcDiffAccess(counts, clusters, min.p)
+}
+
+
+
+#' Subset to top differentially accessible peaks for each cluster
+#'
+#' @param peaks_list List of dA peak info per cluster. The output of CalcDiffAccess.
 #' @param qval.cutoff Q-value cutoff to call a site differentially accessible
 #' @param specificity.cutoff Specificity score cutoff
 #' @param logfc.cutoff Log fold-change cutoff
@@ -65,9 +101,9 @@ find_all_diff <- function(counts, clusters, min.p = 1e-100) {
 #' @import GenomicRanges
 #' @export
 #'
-top_diff_peaks <- function(diff_peaks_list, qval.cutoff = 0.05, specificity.cutoff = 1e-4,
-                           logfc.cutoff = 0.5, max.peaks = 2e4) {
-  lapply(diff_peaks_list, function(df) {
+TopDiffPeaks <- function(peaks_list, qval.cutoff = 0.05, specificity.cutoff = 1e-4,
+                         logfc.cutoff = 0.5, max.peaks = 2e4) {
+  lapply(peaks_list, function(df) {
     df <- subset(df, qval < qval.cutoff & specificity > specificity.cutoff & logfc > logfc.cutoff)
     df <- df[order(df$specificity, decreasing = T),]
     df <- df[1:min(max.peaks, nrow(df)),]
@@ -78,8 +114,67 @@ top_diff_peaks <- function(diff_peaks_list, qval.cutoff = 0.05, specificity.cuto
 }
 
 
+#' @title top_diff_peaks
+#' @description Subset to top differentially accessible peaks for each cluster
+#' @param diff_peaks_list List of dA peaks per cluster. Output by find_all_diff
+#' @param qval.cutoff Q-value cutoff to call a site differentially accessible
+#' @param specificity.cutoff Specificity score cutoff
+#' @param logfc.cutoff Log fold-change cutoff
+#' @param max.peaks Max number of peaks to keep for each cluster
+#' @return Filtered list of granges with cluster specificity, logfc, and p-value for each site tested
+#'
+#' @name top_diff_peaks-deprecated
+#' @seealso \code{\link{chromfunks-deprecated}}
+#' @keywords internal
+NULL
+
+#' @rdname chromfunks-deprecated
+#' @section \code{top_diff_peaks}:
+#' For \code{top_diff_peaks}, use \code{\link{TopDiffPeaks}}.
+#'
+#' @export
+#'
+top_diff_peaks <- function(diff_peaks_list, qval.cutoff = 0.05, specificity.cutoff = 1e-4,
+                          logfc.cutoff = 0.5, max.peaks = 2e4) {
+  .Deprecated("TopDiffPeaks")
+  TopDiffPeaks(diff_peaks_list, qval.cutoff, specificity.cutoff,
+               logfc.cutoff, max.peaks)
+}
+
+
+
+#' Subset to top accessible peaks for each cluster regardless of whether the peaks are specific to that cluster
+#'
+#' @param peaks_list List of dA peak info per cluster. The output of CalcDiffAccess.
+#' @param prop.cutoff Minimum fraction of cells where the peak is accessible
+#' @param dev.cutoff Minimum deviation from expected accessibility
+#' @param max.peaks Max number of peaks to keep for each cluster
+#'
+#' @return Filtered list of granges with proportion accessible, deviation for each site tested
+#' @import GenomicRanges
+#' @export
+#'
+TopAccessPeaks <- function(peaks_list, prop.cutoff = 0.05, dev.cutoff = 1, max.peaks = 2e4) {
+  lapply(peaks_list, function(df) {
+    df <- subset(df, prop > prop.cutoff & dev > dev.cutoff)
+    df <- df[order(df$dev, decreasing = T),]
+    df <- df[1:min(max.peaks, nrow(df)),]
+
+    if(nrow(df) > 1) {
+      peaks.df <- peak2df(rownames(df), metadata.df = df[,c("prop", "dev")], keep.colnames = T)
+      return(GenomicRanges::makeGRangesFromDataFrame(peaks.df, keep.extra.columns = T))
+    }
+    else {
+      return(NULL)
+    }
+  })
+}
+
+
 
 ## Helper functions for differential accessibility
+
+
 
 ## Fisher's exact test
 calc_site_phyper <- function(counts, clusters) {
@@ -116,7 +211,7 @@ calc_site_prop <- function(counts, clusters) {
   colnames(acc.sites) <- levels(clusters)
 
   cluster.sizes <- as.numeric(table(clusters)[colnames(acc.sites)])
-  acc.sites/cluster.sizes
+  t(t(acc.sites)/cluster.sizes)
 }
 
 
