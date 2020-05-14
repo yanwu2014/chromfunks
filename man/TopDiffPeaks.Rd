@@ -7,9 +7,12 @@
 TopDiffPeaks(
   peaks_list,
   qval.cutoff = 0.05,
-  specificity.cutoff = 1e-04,
-  logfc.cutoff = 0.5,
-  max.peaks = 20000
+  specificity.cutoff = 0,
+  logfc.cutoff = 0,
+  dev.cutoff = 0,
+  min.prop = 0,
+  max.peaks = 30000,
+  order.by = "qval"
 )
 }
 \arguments{
@@ -20,6 +23,10 @@ TopDiffPeaks(
 \item{specificity.cutoff}{Specificity score cutoff}
 
 \item{logfc.cutoff}{Log fold-change cutoff}
+
+\item{dev.cutoff}{Minumum deviation above expected accessibility within the cluster}
+
+\item{min.prop}{Minimum fraction of cells in the cluster with the site accessible}
 
 \item{max.peaks}{Max number of peaks to keep for each cluster}
 }
