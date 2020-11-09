@@ -4,12 +4,14 @@
 \alias{peak2granges}
 \title{Function for converting peak names into a granges object}
 \usage{
-peak2granges(peak.names, metadata.df = NULL)
+peak2granges(peak.names, metadata.df = NULL, delim = c(":", "-"))
 }
 \arguments{
 \item{peak.names}{Peak names}
 
 \item{metadata.df}{Extra metadata to annotate the peaks with}
+
+\item{delim}{Peak name delimiters}
 }
 \value{
 Peak info in granges format

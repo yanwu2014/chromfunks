@@ -46,16 +46,27 @@ granges2df <- function(gr) {
 #' @param peak.names Peak names
 #' @param keep.colnames Keep column names in resulting dataframe
 #' @param metadata.df Extra metadata to annotate the peaks with
+#' @param delim Peak name delimiter
 #'
 #' @return Peak info in dataframe format
 #' @import GenomicRanges
 #' @export
 #'
-peak2df <- function(peak.names, keep.colnames = F, metadata.df = NULL) {
-  chrom <- sapply(peak.names, function(x) strsplit(x, split = ":")[[1]][[1]])
-  bp.range <- sapply(peak.names, function(x) strsplit(x, split = ":")[[1]][[2]])
-  bp1 <- as.integer(sapply(bp.range, function(x) strsplit(x, split = "-")[[1]][[1]]))
-  bp2 <- as.integer(sapply(bp.range, function(x) strsplit(x, split = "-")[[1]][[2]]))
+peak2df <- function(peak.names, keep.colnames = F, metadata.df = NULL,
+                    delim = c(":", "-")) {
+  if (length(delim) > 1 && delim[[1]] == ":" && delim[[2]] == "-") {
+    chrom <- sapply(peak.names, function(x) strsplit(x, split = ":")[[1]][[1]])
+    bp.range <- sapply(peak.names, function(x) strsplit(x, split = ":")[[1]][[2]])
+    bp1 <- as.integer(sapply(bp.range, function(x) strsplit(x, split = "-")[[1]][[1]]))
+    bp2 <- as.integer(sapply(bp.range, function(x) strsplit(x, split = "-")[[1]][[2]]))
+  } else if (delim == "-") {
+    chrom <- sapply(peak.names, function(x) strsplit(x, split = "-")[[1]][[1]])
+    bp1 <- as.integer(sapply(peak.names, function(x) strsplit(x, split = "-")[[1]][[2]]))
+    bp2 <- as.integer(sapply(peak.names, function(x) strsplit(x, split = "-")[[1]][[3]]))
+  } else {
+    stop("Invalid delim")
+  }
+
 
   bed.df <- data.frame("chr" = chrom, "start" = bp1, "end" = bp2)
   if (!is.null(metadata.df)) bed.df <- cbind(bed.df, metadata.df)
@@ -72,16 +83,33 @@ peak2df <- function(peak.names, keep.colnames = F, metadata.df = NULL) {
 #'
 #' @param peak.names Peak names
 #' @param metadata.df Extra metadata to annotate the peaks with
+#' @param delim Peak name delimiters
 #'
 #' @return Peak info in granges format
 #' @import GenomicRanges
 #' @export
 #'
-peak2granges <- function(peak.names, metadata.df = NULL) {
-  bed.df <- peak2df(peak.names, keep.colnames = T, metadata.df = metadata.df)
+peak2granges <- function(peak.names, metadata.df = NULL, delim = c(":", "-")) {
+  bed.df <- peak2df(peak.names, keep.colnames = T, metadata.df = metadata.df,
+                    delim = delim)
   makeGRangesFromDataFrame(bed.df, keep.extra.columns = T)
 }
 
+
+#' Function for converting a granges object into a character vector of peak names
+#'
+#' @param gr GenomicRanges object
+#' @param delim Peak name delimiter
+#'
+#' @return Character vector of peak names
+#' @import GenomicRanges
+#' @export
+#'
+granges2peak <- function(gr, delim = c(":", "-")) {
+  paste0(seqnames(gr), delim[[1]],
+         start(gr), delim[[2]],
+         end(gr))
+}
 
 
 #' Inverts a list
@@ -148,19 +176,32 @@ formatCisTopicPeaks <- function(peak.names) {
 }
 
 
-#' Reformat rownames
+#' Flatten Matrix into a vector
 #'
-#' @param m Dense matrix
-#'
-#' @return The same matrix in dataframe format
+#' @param mat Matrix
+#' @param delim Delimiter to separate row and column names
+#' @return Vector with row and column names concatenated by delim
 #' @export
 #'
-FlattenMatrix <- function(m) {
-  rows = dim(m)[1]
-  cols = dim(m)[2]
-  cbind(rowInd = rep(1:rows, times = cols),
-        colInd = rep(1:cols, each = rows),
-        reshape2::melt(m))
+FlattenMatrix <- function(mat, delim = "_") {
+  df <- reshape2::melt(mat)
+  vec <- df$value
+  names(vec) <- paste0(df$Var1, delim, df$Var2)
+  vec
+}
+
+#' Unflatten a vector into a matrix
+#'
+#' @param v Vector
+#' @param delim Delimiter to separate row and column names
+#' @return Matrix
+#' @export
+#'
+UnflattenVec <- function(v, delim = "_") {
+  x.lab <- sapply(names(v), ExtractField, delim = delim, field = 1)
+  y.lab <- sapply(names(v), ExtractField, delim = delim, field = 2)
+  df <- data.frame(x.lab, y.lab, v)
+  UnflattenDataframe(df, output.name = "v", row.col = "x.lab", col.col = "y.lab")
 }
 
 

@@ -34,13 +34,16 @@ ImportCausalSNPs <- function(files, colidx = 5) {
 #' @param bg.peaks Matrix of background peaks. Will be computed with getBackgroundPeaks if not specified
 #' @param min.z Z-score cutoff for peaks
 #' @param min.PP Posterior probability score for peaks
+#' @param return.mat Return all z-scores
 #'
 #' @return List of lists of causal peaks for each trait and cell type. Each trait/cell type pair has a dataframe with the z-score, accessibility deviation, and posterior probability for each causal peak
 #'
 #' @import GenomicRanges
+#' @import Matrix
 #' @export
 #'
-FindCausalPeaks <- function(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.025) {
+FindCausalPeaks <- function(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.025,
+                            return.mat = F) {
   require(chromVAR)
   require(gchromVAR)
 
@@ -57,7 +60,7 @@ FindCausalPeaks <- function(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.0
   rownames(trait.scores) <- rownames(traits)
 
   ## Find peaks overlapping with causal SNPs for each trait
-  causal.peaks <- sapply(colnames(trait.scores), function(trait) {
+  causal.peaks <- lapply(colnames(trait.scores), function(trait) {
     w <- trait.scores[,trait]
     w[w > 0]
   })
@@ -100,7 +103,11 @@ FindCausalPeaks <- function(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.0
     })
     names(z.list) <- colnames(z)
 
-    return(z.list)
+    if (return.mat) {
+      return(z)
+    } else {
+      return(z.list)
+    }
   })
   names(causal.z) <- names(causal.peaks)
 

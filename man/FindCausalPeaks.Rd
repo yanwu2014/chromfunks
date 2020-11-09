@@ -4,7 +4,14 @@
 \alias{FindCausalPeaks}
 \title{Identify most impactful SNPs for a given trait/cell type combo}
 \usage{
-FindCausalPeaks(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.025)
+FindCausalPeaks(
+  SE,
+  traits,
+  bg.peaks = NULL,
+  min.z = 1,
+  min.PP = 0.025,
+  return.mat = F
+)
 }
 \arguments{
 \item{SE}{Accessibility counts as a Summarized Experiment object}
@@ -16,6 +23,8 @@ FindCausalPeaks(SE, traits, bg.peaks = NULL, min.z = 1, min.PP = 0.025)
 \item{min.z}{Z-score cutoff for peaks}
 
 \item{min.PP}{Posterior probability score for peaks}
+
+\item{return.mat}{Return all z-scores}
 }
 \value{
 List of lists of causal peaks for each trait and cell type. Each trait/cell type pair has a dataframe with the z-score, accessibility deviation, and posterior probability for each causal peak

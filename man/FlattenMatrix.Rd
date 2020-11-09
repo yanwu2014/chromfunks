@@ -2,16 +2,18 @@
 % Please edit documentation in R/utility.R
 \name{FlattenMatrix}
 \alias{FlattenMatrix}
-\title{Reformat rownames}
+\title{Flatten Matrix into a vector}
 \usage{
-FlattenMatrix(m)
+FlattenMatrix(mat, delim = "_")
 }
 \arguments{
-\item{m}{Dense matrix}
+\item{mat}{Matrix}
+
+\item{delim}{Delimiter to separate row and column names}
 }
 \value{
-The same matrix in dataframe format
+Vector with row and column names concatenated by delim
 }
 \description{
-Reformat rownames
+Flatten Matrix into a vector
 }
