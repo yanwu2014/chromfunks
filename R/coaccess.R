@@ -159,10 +159,10 @@ peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
 
 
 
-#' Compute relationship between arbitrary and genes using coaccessibility between peaks/promoters
+#' Compute relationship between arbitrary regions and genes using coaccessibility between peaks/promoters
 #'
 #' @param regions Genomic regions in granges format
-#' @param regions.anno Annnotated genomic regions
+#' @param regions.anno Annnotated genomic regions in dataframe format
 #' @param conns Dataframe of peak to peak coaccessibility
 #' @param hg38.chr.lengths Chromosome lengths
 #' @param link.promoter Include peaks in gene promoters
@@ -180,8 +180,8 @@ peak_gene_coaccess <- function(peaks.gr, conns, link.promoter = T,
 #' @export
 #'
 region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths, link.promoter = F,
-                                 promoter.region = c(-5000, 5000), anno.level = "transcript",
-                                 buffer.size = 1e3, region.name = "HAR") {
+                                 promoter.region = c(-3000, 3000), anno.level = "transcript",
+                                 buffer.size = 1500, region.name = "HAR") {
   require(org.Hs.eg.db)
   require(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
@@ -202,7 +202,10 @@ region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths,
 
   regions.conns.ix.vector <- as.character(regions.conns.ix@to)
   names(regions.conns.ix.vector) <- as.character(regions.conns.ix@from)
-  regions.conns.ix.list <- UnflattenGroups(regions.conns.ix.vector)
+  regions.conns.ix.list <- lapply(unique(regions.conns.ix.vector), function(x) {
+    names(regions.conns.ix.vector[regions.conns.ix.vector == x])
+  })
+  names(regions.conns.ix.list) <- unique(regions.conns.ix.vector)
   names(regions.conns.ix.list) <- regions@elementMetadata[[region.name]][as.integer(names(regions.conns.ix.list))]
 
   ## Link HAR to a gene if the HAR is in the promoter region
@@ -237,8 +240,10 @@ region_gene_coaccess <- function(regions, regions.anno, conns, hg38.chr.lengths,
 
   region.gene.weights.list <- lapply(region.gene.weights.list, function(w) {
     if (length(w) > 1) w <- tapply(w, names(w), max)
-    w
+    w[!(is.na(w) | is.na(names(w)))]
   })
+  region.gene.weights.list <- region.gene.weights.list[sapply(region.gene.weights.list, function(x) !is.null(x))]
+  region.gene.weights.list <- region.gene.weights.list[sapply(region.gene.weights.list, function(x) length(x) > 0)]
 
   all.region.genes <- unique(unlist(lapply(region.gene.weights.list, names), F, F))
   region.gene.weights <- matrix(0, length(regions), length(all.region.genes))

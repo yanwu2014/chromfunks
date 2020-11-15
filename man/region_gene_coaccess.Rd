@@ -2,7 +2,7 @@
 % Please edit documentation in R/coaccess.R
 \name{region_gene_coaccess}
 \alias{region_gene_coaccess}
-\title{Compute relationship between arbitrary and genes using coaccessibility between peaks/promoters}
+\title{Compute relationship between arbitrary regions and genes using coaccessibility between peaks/promoters}
 \usage{
 region_gene_coaccess(
   regions,
@@ -10,16 +10,16 @@ region_gene_coaccess(
   conns,
   hg38.chr.lengths,
   link.promoter = F,
-  promoter.region = c(-5000, 5000),
+  promoter.region = c(-3000, 3000),
   anno.level = "transcript",
-  buffer.size = 1000,
+  buffer.size = 1500,
   region.name = "HAR"
 )
 }
 \arguments{
 \item{regions}{Genomic regions in granges format}
 
-\item{regions.anno}{Annnotated genomic regions}
+\item{regions.anno}{Annnotated genomic regions in dataframe format}
 
 \item{conns}{Dataframe of peak to peak coaccessibility}
 
@@ -39,5 +39,5 @@ region_gene_coaccess(
 Matrix of region to gene coaccessibilities. A score of 1 means the region is in the gene promoter.
 }
 \description{
-Compute relationship between arbitrary and genes using coaccessibility between peaks/promoters
+Compute relationship between arbitrary regions and genes using coaccessibility between peaks/promoters
 }
