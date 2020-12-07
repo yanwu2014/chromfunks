@@ -2,7 +2,7 @@
 % Please edit documentation in R/coaccess.R
 \name{FilterConns}
 \alias{FilterConns}
-\title{}
+\title{Reformat coaccessible peaks in list format}
 \usage{
 FilterConns(conns, min.coaccess)
 }
@@ -15,5 +15,5 @@ FilterConns(conns, min.coaccess)
 List of coaccessible peaks (in granges format) for each peak
 }
 \description{
-
+Reformat coaccessible peaks in list format
 }

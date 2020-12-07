@@ -1,30 +1,6 @@
 ## Functions for handling coaccessibility (defined using either Cicero or Hi-C)
 
 
-#' #' Reformat coaccessible peaks in list format
-#' #'
-#' #' @param peaks to find coaccessible peaks for
-#' #' @param conns Dataframe of peak to peak connections
-#' #'
-#' #' @return List of coaccessible peaks (in granges format) for each peak
-#' #' @export
-#' #'
-#' get_coaccess_peaks <- function(peaks, conns) {
-#'   conns.df <- subset(conns, Peak1 %in% peaks)
-#'   peaks <- peaks[peaks %in% conns.df$Peak1]
-#'   peaks.conns.list <- lapply(peaks, function(peak) {
-#'     df <- subset(conns.df, Peak1 == peak)
-#'     gr <- peak2granges(as.character(df$Peak2))
-#'     gr$coaccess <- df$coaccess
-#'     gr
-#'   })
-#'   names(peaks.conns.list) <- peaks
-#'
-#'   peaks.conns.list
-#' }
-
-
-
 #' Reformat coaccessible peaks in list format
 #'
 #' @param peaks to find coaccessible peaks for
