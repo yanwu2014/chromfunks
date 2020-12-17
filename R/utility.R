@@ -183,7 +183,7 @@ formatCisTopicPeaks <- function(peak.names) {
 #' @return Vector with row and column names concatenated by delim
 #' @export
 #'
-FlattenMatrix <- function(mat, delim = "_") {
+flattenMat <- function(mat, delim = "_") {
   df <- reshape2::melt(mat)
   vec <- df$value
   names(vec) <- paste0(df$Var1, delim, df$Var2)
@@ -197,7 +197,7 @@ FlattenMatrix <- function(mat, delim = "_") {
 #' @return Matrix
 #' @export
 #'
-UnflattenVec <- function(v, delim = "_") {
+unflattenVec <- function(v, delim = "_") {
   x.lab <- sapply(names(v), ExtractField, delim = delim, field = 1)
   y.lab <- sapply(names(v), ExtractField, delim = delim, field = 2)
   df <- data.frame(x.lab, y.lab, v)
@@ -248,4 +248,55 @@ getBulkDev <- function(counts) {
 
   ## Compute deviation from expected counts
   (counts - expected.counts)/expected.counts
+}
+
+
+
+#' Get an approximate accessibility matrix for arbitrary regions by using the peaks overlapping those regions
+#'
+#' @param regions.gr GRanges object of regions to create matrix for
+#' @param peaks.gr GRanges object of peaks in peaks matrix
+#' @param peaks.mat Sparse peak accessibility matrix. Rows must match peaks.gr
+#' @return A matrix of accessibility for each region
+#'
+#' @export
+#'
+buildRegionMatrix <- function(regions.gr, peaks.gr, peaks.mat) {
+  regions.peaks.list <- RegionOverlapList(regions.gr, peaks.gr,
+                                      gr1.name = "HAR")
+  regions.peaks.list <- lapply(regions.peaks.list, function(gr) granges2peak(gr))
+
+  all.regions.peaks <- unique(unlist(regions.peaks.list, F, F))
+  peaks.mat <- as.matrix(peaks.mat[all.regions.peaks,])
+
+  regions.peaks.list <- lapply(regions.peaks.list, function(peaks) {
+    if (length(peaks) > 1) return(colMeans(peaks.mat[peaks,]))
+    else return(peaks.mat[peaks,])
+  })
+
+  har.fetal.counts <- do.call(rbind, regions.peaks.list)
+}
+
+
+#' Get gene body information from a human txdb object
+#'
+#' @param txdb TxDb object (i.e. TxDb.Hsapiens.UCSC.hg38.knownGene)
+#' @return GRanges of gene body annotations
+#'
+#' @import annotate
+#' @export
+#'
+geneAnno <- function(txdb) {
+  require(org.Hs.eg.db)
+  require(annotate)
+
+  genes.anno <- genes(txdb)
+  names(genes.anno) <- genes.anno$gene_id
+  genes.anno <- genes.anno[!is.na(genes.anno$gene_id)]
+
+  entrez.to.symbol <- getSYMBOL(genes.anno$gene_id, data = "org.Hs.eg.db")
+  genes.anno <- genes.anno[names(entrez.to.symbol)]
+  genes.anno$gene_symbol <- entrez.to.symbol
+
+  genes.anno
 }

@@ -4,7 +4,7 @@
 \alias{RegionOverlapList}
 \title{Overlap genomic regions}
 \usage{
-RegionOverlapList(gr1, gr2, gr1.name = "HAR")
+RegionOverlapList(gr1, gr2, gr1.name = NULL)
 }
 \arguments{
 \item{gr1}{First set of regions to overlap (granges format)}

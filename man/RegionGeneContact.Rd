@@ -10,7 +10,7 @@ RegionGeneContact(
   link.promoter = F,
   promoter.region = c(-3000, 3000),
   anno.level = "transcript",
-  region.name = "HAR"
+  region.name = NULL
 )
 }
 \arguments{
