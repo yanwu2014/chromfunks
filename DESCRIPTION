@@ -1,7 +1,7 @@
 Package: chromfunks
 Type: Package
 Title: Functions for Analyzing Chromatin Accessibility Data
-Version: 0.4.1
+Version: 0.4.2
 Author: Yan Wu
 Maintainer: Yan Wu <yauwning@gmail.com>
 Description: A series of functions to help with integrating GWAS results with chromatin accessibility peaks
@@ -22,6 +22,7 @@ Imports:
   org.Hs.eg.db,
   TxDb.Hsapiens.UCSC.hg38.knownGene,
   SummarizedExperiment,
+  chromVAR,
   Signac,
   annotate
 Suggests:
