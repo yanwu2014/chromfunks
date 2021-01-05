@@ -5,7 +5,7 @@ Installation instructions:
 
 ```
 BiocManager::install()
-BiocManager::install(c("limma", "GenomicRanges", "biomaRt", "ChIPseeker", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg38.knownGene", "chromVAR", "SummarizedExperiment"))
+BiocManager::install(c("limma", "GenomicRanges", "biomaRt", "ChIPseeker", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg38.knownGene", "chromVAR", "SummarizedExperiment", "ChIPseeker"))
 devtools::install_github("yanwu2014/chromfunks")
 ```
 

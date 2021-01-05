@@ -13,9 +13,9 @@ FindNearbyGenes(regions, genes.anno, distance, chr.lengths, region.name = NULL)
 
 \item{chr.lengths}{Chromosome sizes}
 
-\item{gr}{Genomic regions}
+\item{region.name}{Name of each region if in the GRanges metadata. Otherwise set to null.}
 
-\item{gr.name}{Name of each region if in the GRanges metadata. Otherwise set to null.}
+\item{gr}{Genomic regions}
 }
 \value{
 List of genes within specified distance of genomic regions

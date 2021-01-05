@@ -65,7 +65,8 @@ RegionOverlapList <- function(gr1, gr2, gr1.name = NULL) {
 #' @param link.promoter Include peaks in gene promoters
 #' @param promoter.region Specify the window around the TSS that counts as a promoter
 #' @param anno.level Specify "gene" or "transcript" for a gene/transcript level annotation
-#' @param region.name Name of region identifier
+#' @param region.name Column name of region identifier. Defaults to peak names
+#' @param weight.col Column name of weights (i.e. when using coaccessibility). Defaults to 1
 #'
 #' @return Matrix of region to gene Hi-C/coaccessibility connections
 #'
@@ -74,11 +75,18 @@ RegionOverlapList <- function(gr1, gr2, gr1.name = NULL) {
 #' @import Matrix
 #' @export
 #'
-RegionGeneContact <- function(regions, conns, link.promoter = F, promoter.region = c(-3000, 3000),
-                              anno.level = "transcript", region.name = NULL) {
+RegionGeneLinks <- function(regions,
+                            conns,
+                            link.promoter = T,
+                            promoter.region = c(-3000, 3000),
+                            anno.level = "transcript",
+                            region.name = NULL,
+                            weight.col = NULL)
+{
   require(org.Hs.eg.db)
   require(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
+  ## Get region names
   regions <- unique(regions)
   regions.peaks <- granges2peak(regions)
   if (is.null(region.name)) {
@@ -87,20 +95,30 @@ RegionGeneContact <- function(regions, conns, link.promoter = F, promoter.region
     names(regions) <- regions@elementMetadata[[region.name]]
   }
 
+  ## Annotate regions
   regions.anno <- annotatePeak(regions, tssRegion = promoter.region, level = anno.level,
                                TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene,
                                annoDb = "org.Hs.eg.db")
   regions.anno <- as.data.frame(regions.anno)
 
+  ## Find overlaps between peak1 and regions
   peak1.gr <- peak2granges(conns$Peak1)
   regions.conns.ix <- findOverlaps(peak1.gr, regions)
 
+  ## Annotate peak2
   peak2.gr <- peak2granges(conns$Peak2)
   peak2.gr.anno <- annotatePeak(peak2.gr, tssRegion = promoter.region, level = anno.level,
                                 TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene,
                                 annoDb = "org.Hs.eg.db")
   peak2.gr.anno <- peak2.gr.anno@anno
-  peak2.gr.anno$coaccess <- conns$coaccess
+
+  ## Get weights (otherwise set to 1 if null)
+  if (!is.null(weight.col)) {
+    stopifnot(weight.col %in% colnames(conns))
+    peak2.gr.anno$weights <- conns[[weight.col]]
+  } else {
+    peak2.gr.anno$weights <- 1
+  }
 
   regions.conns.ix.vector <- as.character(regions.conns.ix@to)
   names(regions.conns.ix.vector) <- as.character(regions.conns.ix@from)
@@ -133,7 +151,7 @@ RegionGeneContact <- function(regions, conns, link.promoter = F, promoter.region
     peaks.anno.gr <- peak2.gr.anno[peaks.ix]
     peaks.anno.gr <- peaks.anno.gr[grepl("Promoter", peaks.anno.gr$annotation)]
     if (length(peaks.anno.gr) > 0) {
-      w <- peaks.anno.gr$coaccess
+      w <- peaks.anno.gr$weights
       names(w) <- peaks.anno.gr$SYMBOL
       region.gene.weights.list[[h]] <- c(region.gene.weights.list[[h]], w)
     }
@@ -145,17 +163,39 @@ RegionGeneContact <- function(regions, conns, link.promoter = F, promoter.region
   })
   region.gene.weights.list <- region.gene.weights.list[sapply(region.gene.weights.list, function(x) !is.null(x))]
   region.gene.weights.list <- region.gene.weights.list[sapply(region.gene.weights.list, function(x) length(x) > 0)]
-
-  all.region.genes <- unique(unlist(lapply(region.gene.weights.list, names), F, F))
-  region.gene.weights <- matrix(0, length(regions), length(all.region.genes))
-  rownames(region.gene.weights) <- names(regions)
-  colnames(region.gene.weights) <- all.region.genes
-  for(h in names(region.gene.weights.list)) {
-    region.gene.weights[h, names(region.gene.weights.list[[h]])] <- region.gene.weights.list[[h]]
-  }
-
-  as(region.gene.weights, "dgCMatrix")
+  region.gene.weights.df <- lapply(names(region.gene.weights.list), function(i) {
+    weights <- region.gene.weights.list[[i]]
+    data.frame(region = i, gene = names(weights), weight = weights,
+               stringsAsFactors = F)
+  })
+  region.gene.weights.df <- do.call(rbind, region.gene.weights.df)
+  rownames(region.gene.weights.df) <- paste0(region.gene.weights.df$region, "_", region.gene.weights.df$gene)
+  return(region.gene.weights.df)
 }
+
+
+
+#' Add correlations between region accessiblity and gene expression to region-gene links
+#'
+#' @param df Dataframe from RegionGeneLinks Must contain "region" and "gene" columns.
+#' @param region.mat Matrix of region accessibility. Column names must match rna.mat column names
+#' @param rna.mat Matrix of gene expression. Column names must match region.mat column names.
+#' @return Dataframe with the "cor" column added
+#' @export
+#'
+AddRegionGeneCor <- function(df, region.mat, rna.mat) {
+  stopifnot(all(colnames(region.mat) %in% colnames(rna.mat)))
+  region.mat <- region.mat[,colnames(rna.mat)]
+  df <- subset(df, gene %in% rownames(rna.mat) & region %in% rownames(region.mat))
+  df$cor <- rep(0, nrow(df))
+  df$cor <- sapply(1:nrow(df), function(i) {
+    region <- df$region[[i]]
+    gene <- df$gene[[i]]
+    cor(region.mat[region,], rna.mat[gene,])
+  })
+  df
+}
+
 
 
 #' Link TFs to regions overlapping peaks with a TF motif binding site
@@ -205,7 +245,7 @@ TFRegionMotifs <- function(regions, peaks.gr, motif_ix_mat, region.name = NULL) 
 #' @param genes.anno Gene annotations generated by the geneAnno function
 #' @param distance Distance to search for genes
 #' @param chr.lengths Chromosome sizes
-#' @param gr.name Name of each region if in the GRanges metadata. Otherwise set to null.
+#' @param region.name Name of each region if in the GRanges metadata. Otherwise set to null.
 #' @return List of genes within specified distance of genomic regions
 #'
 #' @export
@@ -216,9 +256,18 @@ FindNearbyGenes <- function(regions, genes.anno, distance, chr.lengths, region.n
   } else {
     names(regions) <- regions@elementMetadata[[region.name]]
   }
+
   regions <- extend_gr(regions, buffer = distance, chr.lengths = chr.lengths)
   genes.ix <- findOverlaps(regions, genes.anno)
   genes.ix.vec <- as.character(names(regions)[genes.ix@from])
   names(genes.ix.vec) <- as.character(genes.anno$gene_symbol[genes.ix@to])
-  UnflattenGroups(genes.ix.vec)
+
+  regions.genes.list <- UnflattenGroups(genes.ix.vec)
+  regions.genes.df <- lapply(names(regions.genes.list), function(i) {
+    data.frame(region = i, gene = regions.genes.list[[i]],
+               stringsAsFactors = F)
+  })
+  regions.genes.df <- do.call(rbind, regions.genes.df)
+  rownames(regions.genes.df) <- paste0(regions.genes.df$region, "_", regions.genes.df$gene)
+  regions.genes.df
 }

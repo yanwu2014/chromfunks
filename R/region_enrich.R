@@ -23,6 +23,7 @@ RegionOverlapScores <- function(ranges, regionsList) {
 
   # Make a new SummarizedExperiment and export
   colnames(la) <- names(regionsList)
+  rownames(la) <- granges2peak(ranges)
   as(la, "dgCMatrix")
 }
 
