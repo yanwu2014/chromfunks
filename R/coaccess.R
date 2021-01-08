@@ -169,72 +169,103 @@ RegionGeneLinks <- function(regions,
                stringsAsFactors = F)
   })
   region.gene.weights.df <- do.call(rbind, region.gene.weights.df)
-  rownames(region.gene.weights.df) <- paste0(region.gene.weights.df$region, "_", region.gene.weights.df$gene)
+  rownames(region.gene.weights.df) <- NULL
   return(region.gene.weights.df)
 }
 
 
 
-#' Add correlations between region accessiblity and gene expression to region-gene links
+
+#' Link TFs to peaks using motifs
 #'
-#' @param df Dataframe from RegionGeneLinks Must contain "region" and "gene" columns.
-#' @param region.mat Matrix of region accessibility. Column names must match rna.mat column names
-#' @param rna.mat Matrix of gene expression. Column names must match region.mat column names.
-#' @return Dataframe with the "cor" column added
+#' @param motif_ix Binary motif matrix of regions by TFs specifying which TFs have motifs in which regions
+#' @return TF region motif overlaps in dataframe format
 #' @export
 #'
-AddRegionGeneCor <- function(df, region.mat, rna.mat) {
-  stopifnot(all(colnames(region.mat) %in% colnames(rna.mat)))
-  region.mat <- region.mat[,colnames(rna.mat)]
-  df <- subset(df, gene %in% rownames(rna.mat) & region %in% rownames(region.mat))
-  df$cor <- rep(0, nrow(df))
-  df$cor <- sapply(1:nrow(df), function(i) {
-    region <- df$region[[i]]
-    gene <- df$gene[[i]]
-    cor(region.mat[region,], rna.mat[gene,])
+TFRegionLinks <- function(motif_ix) {
+  tf.region.df <- lapply(colnames(motif_ix), function(i) {
+    ix <- motif_ix[, i]
+    tf.regions <- names(ix[ix > 0])
+    data.frame(TF = i, region = tf.regions,
+               stringsAsFactors = F)
   })
-  df
+  tf.region.df <- do.call(rbind, tf.region.df)
+  rownames(tf.region.df) <- NULL
+  tf.region.df
 }
 
 
 
-#' Link TFs to regions overlapping peaks with a TF motif binding site
+#' Link TFs to genes
 #'
-#' @param regions Regions (in GRanges format) to link to TFs
-#' @param peaks.gr Peaks (in GRanges format)
-#' @param motif_ix_mat Matrix specifying peaks linked to each TF. Rows must match peaks.gr exactly
-#' @param region.name Name of regions (can be NULL)
-#' @return List of regions linked to TFs via binding site motifs
-#'
+#' @param tf.region.df Dataframe linking TFs to regions using motif data
+#' @param region.gene.df Dataframe linking regions to genes using Hi-C or coaccessibility data
+#' @return Dataframe linking TFs to genes
 #' @export
 #'
-TFRegionMotifs <- function(regions, peaks.gr, motif_ix_mat, region.name = NULL) {
-  if (is.null(region.name)) {
-    names(regions) <- regions.peaks
-  } else {
-    names(regions) <- regions@elementMetadata[[region.name]]
-  }
-
-  region.peak.ix <- findOverlaps(regions, peaks.gr)
-  ix_mat <- as.matrix(motif_ix_mat[unique(region.peak.ix@to),])
-
-  region.peak.vec <- names(regions)[region.peak.ix@from]
-  names(region.peak.vec) <- names(peaks.gr)[region.peak.ix@to]
-  region.peak.list <- UnflattenGroups(region.peak.vec)
-
-  motif_ix <- do.call(rbind, lapply(region.peak.list, function(peaks) {
-    if (length(peaks) > 1) return(apply(ix_mat[peaks,], 2, function(x) any(x)))
-    else return(ix_mat[peaks,])
-  }))
-  colnames(motif_ix) <- sapply(colnames(motif_ix), ExtractField, field = 2)
-
-  motif_ix_list <- lapply(colnames(motif_ix), function(tf) {
-    tf_ix <- motif_ix[,tf]
-    names(tf_ix[tf_ix > 0])
+TFGeneLinks <- function(tf.region.df, region.gene.df) {
+  tf.gene.df <- lapply(unique(tf.region.df$TF), function(tf) {
+    tf.regions <- unique(subset(tf.region.df, TF == tf)$region)
+    tf.genes <- unique(subset(region.gene.df, region %in% tf.regions)$gene)
+    if (length(tf.genes) > 0) {
+      return(data.frame(TF = tf, gene = tf.genes, stringsAsFactors = F))
+    } else {
+      return(NULL)
+    }
   })
-  names(motif_ix_list) <- colnames(motif_ix)
+  tf.gene.df <- do.call(rbind, tf.gene.df)
+  rownames(tf.gene.df) <- NULL
+  tf.gene.df
+}
 
-  motif_ix_list
+
+
+
+#' Add correlations between region accessiblity and gene expression to region-gene links
+#'
+#' @param df Dataframe linking two types of features (i.e. TFs & genomic regions, genomic regions & genes, etc)
+#' @param col1 Column name for the 1st feature (i.e. "region")
+#' @param col2 Column name for the 2nd feature (i.e. "gene")
+#' @param mat1 Matrix corresponding to feature 1. Columns must match columns of mat2.
+#' @param mat2 Matrix corresponding to feature 2. Columns must match columns of mat1
+#' @param n.cores Number of cores for parallel processing
+#'
+#' @return Dataframe with the "cor" column added
+#'
+#' @import snow
+#' @export
+#'
+AddLinkCorrelations <- function(df, col1, col2, mat1, mat2, n.cores = 1) {
+  stopifnot(all(colnames(mat1) %in% colnames(mat2)))
+  mat1 <- mat1[,colnames(mat2)]
+  df <- df[df[[col1]] %in% rownames(mat1) & df[[col2]] %in% rownames(mat2),]
+
+  if (n.cores == 1) {
+    col1.vec <- df[[col1]]
+    col2.vec <- df[[col2]]
+    df$cor <- sapply(1:nrow(df), function(i) {
+      i1 <- col1.vec[[i]]
+      i2 <- col2.vec[[i]]
+      cor(mat1[i1,], mat2[i2,])
+    })
+  } else {
+    df.list <- split(df, rep(1:ceiling(nrow(df)/n.cores), each = n.cores, length.out = nrow(df)))
+    cl <- snow::makeCluster(n.cores, type = "SOCK")
+    snow::clusterExport(cl, "col1", "col2", "mat1", "mat2", envir = environment())
+    df.list <- snow::parLapply(cl, df.list, function(df.chunk) {
+      col1.vec <- df.chunk[[col1]]
+      col2.vec <- df.chunk[[col2]]
+      df.chunk$cor <- sapply(1:nrow(df.chunk), function(i) {
+        i1 <- col1.vec[[i]]
+        i2 <- col2.vec[[i]]
+        cor(mat1[i1,], mat2[i2,])
+      })
+      df.chunk
+    })
+    df <- do.call(rbind, df.list)
+    rownames(df) <- NULL
+  }
+  df
 }
 
 
@@ -268,6 +299,6 @@ FindNearbyGenes <- function(regions, genes.anno, distance, chr.lengths, region.n
                stringsAsFactors = F)
   })
   regions.genes.df <- do.call(rbind, regions.genes.df)
-  rownames(regions.genes.df) <- paste0(regions.genes.df$region, "_", regions.genes.df$gene)
+  rownames(regions.genes.df) <- NULL
   regions.genes.df
 }
