@@ -261,8 +261,6 @@ AddLinkCorrelations <- function(df, col1, col2, mat1, mat2, n.cores = 1) {
     df.list <- snow::parLapply(cl, df.list, function(df.chunk) {
       col1.vec <- df.chunk[[col1]]
       col2.vec <- df.chunk[[col2]]
-      mat1 <- as.matrix(mat1[unique(col1.vec),])
-      mat2 <- as.matrix(mat2[unique(col2.vec),])
       df.chunk$cor <- rep(0, nrow(df.chunk))
       df.chunk$cor <- sapply(1:nrow(df.chunk), function(i) {
         i1 <- col1.vec[[i]]
