@@ -238,7 +238,13 @@ TFGeneLinks <- function(tf.region.df, region.gene.df) {
 AddLinkCorrelations <- function(df, col1, col2, mat1, mat2, n.cores = 1) {
   stopifnot(all(colnames(mat1) %in% colnames(mat2)))
   mat1 <- mat1[,colnames(mat2)]
+
+  df[[col1]] <- as.character(df[[col1]])
+  df[[col2]] <- as.character(df[[col2]])
   df <- df[df[[col1]] %in% rownames(mat1) & df[[col2]] %in% rownames(mat2),]
+
+  mat1 <- as.matrix(mat1[unique(df[[col1]]),])
+  mat2 <- as.matrix(mat2[unique(df[[col2]]),])
 
   if (n.cores == 1) {
     col1.vec <- df[[col1]]
@@ -251,10 +257,13 @@ AddLinkCorrelations <- function(df, col1, col2, mat1, mat2, n.cores = 1) {
   } else {
     df.list <- split(df, rep(1:ceiling(nrow(df)/n.cores), each = n.cores, length.out = nrow(df)))
     cl <- snow::makeCluster(n.cores, type = "SOCK")
-    snow::clusterExport(cl, "col1", "col2", "mat1", "mat2", envir = environment())
+    snow::clusterExport(cl, c("col1", "col2", "mat1", "mat2"), envir = environment())
     df.list <- snow::parLapply(cl, df.list, function(df.chunk) {
       col1.vec <- df.chunk[[col1]]
       col2.vec <- df.chunk[[col2]]
+      mat1 <- as.matrix(mat1[unique(col1.vec),])
+      mat2 <- as.matrix(mat2[unique(col2.vec),])
+      df.chunk$cor <- rep(0, nrow(df.chunk))
       df.chunk$cor <- sapply(1:nrow(df.chunk), function(i) {
         i1 <- col1.vec[[i]]
         i2 <- col2.vec[[i]]
