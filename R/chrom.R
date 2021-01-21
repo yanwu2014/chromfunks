@@ -92,3 +92,54 @@ GetBinCounts <- function(counts, reduced_coordinates, k = 50, silent = T) {
   colnames(bin.counts) <- paste0("agg", chosen)
   bin.counts
 }
+
+
+
+#' Compute the log TF-IDF transform for accessibility matrices
+#' Adapted from Signac
+#'
+#' @param counts Accessibility counts matrix
+#' @param scale.factor Factor to scale normalized counts with. Default is 10000.
+#' @param verbose Print progress
+#'
+#' @return Counts matrix normalized with the log(TF-IDF + 1) transform
+#' @export
+#'
+LogTFIDF <- function(counts, scale.factor = 1e4, verbose = T) {
+  counts <- as(counts, Class = "dgCMatrix")
+
+  if (verbose) {
+    message("Performing TF-IDF normalization")
+  }
+
+  ## Term frequency
+  npeaks <- colSums(counts)
+  if (any(npeaks == 0)) {
+    warning("Some cells contain 0 total counts")
+  }
+  tf <- tcrossprod(counts, y = Diagonal(x = 1 / npeaks))
+
+  ## Inverse document frequency
+  rsums <- rowSums(counts)
+  if (any(rsums == 0)) {
+    warning("Some features contain 0 total counts")
+  }
+  idf <- ncol(counts) / rsums
+
+  ## Compute TF-IDF
+  norm.data <- Diagonal(n = length(x = idf), x = idf) %*% tf
+
+  ## Take log transform
+  slot(norm.data, name = "x") <- log1p(
+    x = slot(norm.data, name = "x") * scale.factor
+  )
+  colnames(norm.data) <- colnames(counts)
+  rownames(norm.data) <- rownames(counts)
+
+  ## Set NA values to 0
+  vals <- slot(norm.data, name = "x")
+  vals[is.na(x = vals)] <- 0
+  slot(norm.data, name = "x") <- vals
+
+  return(norm.data)
+}

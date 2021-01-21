@@ -182,7 +182,7 @@ RegionGeneLinks <- function(regions,
 #' @return TF region motif overlaps in dataframe format
 #' @export
 #'
-TFRegionLinks <- function(motif_ix) {
+MotifRegionLinks <- function(motif_ix) {
   tf.region.df <- lapply(colnames(motif_ix), function(i) {
     ix <- motif_ix[, i]
     tf.regions <- names(ix[ix > 0])
@@ -193,6 +193,72 @@ TFRegionLinks <- function(motif_ix) {
   rownames(tf.region.df) <- NULL
   tf.region.df
 }
+
+
+#' Link TFs to regions using motifs and correlations between TF motif activity and region accessibility
+#'
+#' @param counts Single cell accessibility counts matrix (peaks by cells)
+#' @param embeddings Dimensionality reduction used to generate bins (cells by dimensions)
+#' @param regions Regions to link TFs to. If null will link TFs to all peaks.
+#' @param bin.size Number of cells per bin
+#' @param n.cores Number of cores
+#'
+#' @return Dataframe of TF to region links and the correlation between TF motif activity and accessibility
+#' @export
+#'
+TFRegionLinks <- function(counts, embeddings, regions, bin.size = 50, n.cores = 4) {
+  require(chromVAR)
+  require(chromVARmotifs)
+  require(SummarizedExperiment)
+  require(motifmatchr)
+
+  ## Get accessible peaks in granges format
+  peaks <- peak2granges(rownames(counts))
+
+  ## Get overlapping peaks
+  if (is.null(regions)) {
+    regions.peaks <- rownames(counts)
+  } else {
+    regions.ix <- findOverlaps(peaks, regions)
+    regions.peaks <- granges2peak(peaks[unique(regions.ix@from)])
+    length(regions.peaks)
+  }
+
+  ## Create binned counts for improved correlations
+  stopifnot(all(colnames(counts) %in% rownames(embeddings)))
+  bin.counts <- GetBinCounts(counts, embeddings[colnames(counts),], k = bin.size)
+  bin.norm.counts <- LogTFIDF(bin.counts)
+
+  ## Subset to peaks overlapping HAR/HGE regions to save memory
+  bin.counts <- bin.counts[regions.peaks,]
+  bin.norm.counts <- bin.norm.counts[regions.peaks,]
+
+  ## Run chromVAR at the single cell level for correlating TF activity to HAR/HGE peaks with TF motifs
+  bin.SE <- SummarizedExperiment(assays = list(counts = bin.counts),
+                                 rowData = peaks[rownames(bin.counts)],
+                                 colData = DataFrame(names = colnames(bin.counts)))
+  bin.SE <- addGCBias(bin.SE, genome = BSgenome.Hsapiens.UCSC.hg38)
+
+  motifs <- getJasparMotifs()
+  motif.ix <- matchMotifs(motifs, bin.SE, genome = BSgenome.Hsapiens.UCSC.hg38)
+
+  register(MulticoreParam(n.cores))
+  tf.dev <- computeDeviations(object = bin.SE, annotations = motif.ix)
+  tf.z <- assays(tf.dev)[["z"]]
+  rownames(tf.z) <- sapply(rownames(tf.z), extractField, 2)
+
+  ## Format TF motif names
+  motif.mat <- assay(motif.ix)
+  colnames(motif.mat) <- sapply(colnames(motif.mat), extractField, field = 2)
+
+  ## Link TFs to regions using motifs
+  tf.peak.df <- MotifRegionLinks(motif.mat)
+  AddLinkCorrelations(tf.peak.df, "TF", "region",
+                      tf.z[,colnames(bin.counts)],
+                      bin.norm.counts[,colnames(bin.counts)],
+                      n.cores = n.cores)
+}
+
 
 
 
@@ -232,10 +298,11 @@ TFGeneLinks <- function(tf.region.df, region.gene.df) {
 #'
 #' @return Dataframe with the "cor" column added
 #'
-#' @import snow
 #' @export
 #'
 AddLinkCorrelations <- function(df, col1, col2, mat1, mat2, n.cores = 1) {
+  require(snow)
+
   stopifnot(all(colnames(mat1) %in% colnames(mat2)))
   mat1 <- mat1[,colnames(mat2)]
 

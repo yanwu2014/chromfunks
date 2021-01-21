@@ -2,16 +2,24 @@
 % Please edit documentation in R/coaccess.R
 \name{TFRegionLinks}
 \alias{TFRegionLinks}
-\title{Link TFs to peaks using motifs}
+\title{Link TFs to regions using motifs and correlations between TF motif activity and region accessibility}
 \usage{
-TFRegionLinks(motif_ix)
+TFRegionLinks(counts, embeddings, regions, bin.size = 50, n.cores = 4)
 }
 \arguments{
-\item{motif_ix}{Binary motif matrix of regions by TFs specifying which TFs have motifs in which regions}
+\item{counts}{Single cell accessibility counts matrix (peaks by cells)}
+
+\item{embeddings}{Dimensionality reduction used to generate bins (cells by dimensions)}
+
+\item{regions}{Regions to link TFs to. If null will link TFs to all peaks.}
+
+\item{bin.size}{Number of cells per bin}
+
+\item{n.cores}{Number of cores}
 }
 \value{
-TF region motif overlaps in dataframe format
+Dataframe of TF to region links and the correlation between TF motif activity and accessibility
 }
 \description{
-Link TFs to peaks using motifs
+Link TFs to regions using motifs and correlations between TF motif activity and region accessibility
 }

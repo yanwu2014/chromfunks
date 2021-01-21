@@ -252,38 +252,11 @@ getBulkDev <- function(counts) {
 
 
 
-#' Get an approximate accessibility matrix for arbitrary regions by using the peaks overlapping those regions
-#'
-#' @param regions.gr GRanges object of regions to create matrix for
-#' @param peaks.gr GRanges object of peaks in peaks matrix
-#' @param peaks.mat Sparse peak accessibility matrix. Rows must match peaks.gr
-#' @return A matrix of accessibility for each region
-#'
-#' @export
-#'
-buildRegionMatrix <- function(regions.gr, peaks.gr, peaks.mat) {
-  regions.peaks.list <- RegionOverlapList(regions.gr, peaks.gr,
-                                      gr1.name = "HAR")
-  regions.peaks.list <- lapply(regions.peaks.list, function(gr) granges2peak(gr))
-
-  all.regions.peaks <- unique(unlist(regions.peaks.list, F, F))
-  peaks.mat <- as.matrix(peaks.mat[all.regions.peaks,])
-
-  regions.peaks.list <- lapply(regions.peaks.list, function(peaks) {
-    if (length(peaks) > 1) return(colMeans(peaks.mat[peaks,]))
-    else return(peaks.mat[peaks,])
-  })
-
-  har.fetal.counts <- do.call(rbind, regions.peaks.list)
-}
-
-
 #' Get gene body information from a human txdb object
 #'
 #' @param txdb TxDb object (i.e. TxDb.Hsapiens.UCSC.hg38.knownGene)
 #' @return GRanges of gene body annotations
 #'
-#' @import annotate
 #' @export
 #'
 geneAnno <- function(txdb) {
@@ -299,4 +272,21 @@ geneAnno <- function(txdb) {
   genes.anno$gene_symbol <- entrez.to.symbol
 
   genes.anno
+}
+
+
+#' Extract the desired field from a delimited string
+#'
+#' @param string Input string
+#' @param field Field position
+#' @param delim Delimiter (i.e. tabs, spaces, underscores, commas)
+#'
+#' @return Extracted field
+#'
+extractField <- function (string, field = 1, delim = "_") {
+  fields <- as.numeric(unlist(strsplit(x = as.character(x = field), split = ",")))
+  if (length(fields) == 1) {
+    return(strsplit(string, split = delim)[[1]][field])
+  }
+  return(paste(strsplit(string, split = delim)[[1]][fields], collapse = delim))
 }

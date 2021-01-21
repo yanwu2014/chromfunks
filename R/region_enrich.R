@@ -29,8 +29,6 @@ RegionOverlapScores <- function(ranges, regionsList) {
 
 
 #' Compute enrichment in each column of the chromatin accessibility matrix for all regions in regionsList
-#'@import chromVAR
-#'@import SummarizedExperiment
 #'
 #'@param SE Peaks accessibility matrix in SummarizedExperiment format
 #'@param regionsList List of regions in GenomicRanges format
@@ -40,6 +38,9 @@ RegionOverlapScores <- function(ranges, regionsList) {
 #'@export
 #'
 ChromRegionEnrich <- function(SE, regionsList, n.runs = 5) {
+  require(chromVAR)
+  require(SummarizedExperiment)
+
   scores.mat <- RegionOverlapScores(rowRanges(SE), regionsList)
 
   dev_list <- lapply(1:n.runs, function(i) {
@@ -56,8 +57,6 @@ ChromRegionEnrich <- function(SE, regionsList, n.runs = 5) {
 
 
 #' Run chromVAR on a subset of peaks overlapping a list of regions
-#'@import chromVAR
-#'@import SummarizedExperiment
 #'
 #'@param SE Peaks accessibility matrix in SummarizedExperiment format
 #'@param motif_ix Transcription factor motif data in SummarizedExperiment format (from motifmatchr)
@@ -68,6 +67,9 @@ ChromRegionEnrich <- function(SE, regionsList, n.runs = 5) {
 #'@export
 #'
 RegionChromVAR <- function(SE, motif_ix, regionList, n.runs) {
+  require(chromVAR)
+  require(SummarizedExperiment)
+
   region.peak.scores <- RegionOverlapScores(rowRanges(SE), regionList)
   peak.maps <- lapply(colnames(region.peak.scores), function(i) {
     ix <- region.peak.scores[,i]
