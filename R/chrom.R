@@ -143,3 +143,33 @@ LogTFIDF <- function(counts, scale.factor = 1e4, verbose = T) {
 
   return(norm.data)
 }
+
+
+#' Average counts matrix by cluster/cell type
+#'
+#' @param counts Counts matrix
+#' @param idents Cluster/Cell Type identities
+#' @param binarize Binarize the matrix before computing averages
+#'
+#' @import Matrix
+#' @return Counts matrix averaged over clusters/cell types
+#' @export
+#'
+GetClusterAvg <- function(counts, idents, binarize = F) {
+  idents <- factor(idents)
+  stopifnot(all(colnames(counts) %in% names(idents)))
+
+  counts <- counts[,names(idents)]
+  counts <- as(counts, "dgCMatrix")
+  if (binarize) {
+    counts@x[counts@x > 0] <- 1
+  }
+
+  avg.counts <- do.call(cbind, lapply(levels(idents), function(cl) {
+    cells <- names(idents[idents == cl])
+    Matrix::rowMeans(counts[,cells])
+  }))
+  colnames(avg.counts) <- levels(idents)
+
+  return(avg.counts)
+}

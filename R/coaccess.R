@@ -336,6 +336,7 @@ AddLinkCorrelations <- function(df, col1, col2, mat1, mat2, n.cores = 1) {
       })
       df.chunk
     })
+    snow::stopCluster(cl)
     df <- do.call(rbind, df.list)
     rownames(df) <- NULL
   }
@@ -375,4 +376,53 @@ FindNearbyGenes <- function(regions, genes.anno, distance, chr.lengths, region.n
   regions.genes.df <- do.call(rbind, regions.genes.df)
   rownames(regions.genes.df) <- NULL
   regions.genes.df
+}
+
+
+
+#' Subset networks by TF, region, or gene.
+#'
+#' @param tf.region.df TF - region links
+#' @param region.gene.df Region - gene links
+#' @param tfs TFs to keep
+#' @param genes Genes to keep
+#' @param regions Genomic regions to keep (as character vector). Will also keep any overlapping regions.
+#' @param regions.delim Delimiters for genomic regions
+#'
+#' @return List of dataframes containing TF - region links, region - gene links, and TF - gene links
+#'
+#' @import GenomicRanges
+#' @export
+#'
+#'
+SubsetLinks <- function(tf.region.df, region.gene.df, tfs = NULL, genes = NULL,
+                        regions = NULL, regions.delim = c(":", "-")) {
+  if (is.null(tfs) & is.null(regions) & is.null(genes)) {
+    stop("At least one of tfs, regions, or genes must be specified")
+  }
+
+  if (!is.null(tfs)) {
+    tf.region.df <- subset(tf.region.df, TF %in% tfs)
+  }
+
+  if(!is.null(genes)) {
+    region.gene.df <- subset(region.gene.df, gene %in% genes)
+  }
+
+  if(!is.null(regions)) {
+    tf.region.gr <- peak2granges(tf.region.df$region, delim = regions.delim)
+    gene.region.gr <- peak2granges(region.gene.df$region, delim = regions.delim)
+    regions.keep.gr <- peak2granges(regions, delim = regions.delim)
+
+    tf.region.ix <- findOverlaps(tf.region.gr, regions.keep.gr)
+    tf.region.df <- tf.region.df[unique(tf.region.ix@from),]
+
+    gene.region.ix <- findOverlaps(gene.region.gr, regions.keep.gr)
+    region.gene.df <- region.gene.df[unique(gene.region.ix@from),]
+  }
+
+  tf.gene.df <- TFGeneLinks(tf.region.df, region.gene.df)
+  return(list("TF_region_network" = tf.region.df,
+              "Region_gene_network" = region.gene.df,
+              "TF_gene_network" = tf.gene.df))
 }
