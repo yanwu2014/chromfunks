@@ -426,3 +426,43 @@ SubsetLinks <- function(tf.region.df, region.gene.df, tfs = NULL, genes = NULL,
               "Region_gene_network" = region.gene.df,
               "TF_gene_network" = tf.gene.df))
 }
+
+
+
+
+#' Visualize a TF - gene network using igraph
+#'
+#' @param tf.gene.df Dataframe with a TF column and gene column
+#' @param plot.title Title of the plot
+#' @param label Labels the TFs/genes in the graph
+#' @param label.szie Size of TF/gene labels
+#'
+#' @return Plot visualizing the TF - gene network using a force directed layout
+#' @export
+#'
+PlotNetwork <- function(tf.gene.df, plot.title = NULL, label = F, label.size = 0.5) {
+  require(igraph)
+
+  tf.gene.df$edge.label <- paste0(tf.gene.df$TF, "_", tf.gene.df$gene)
+
+  g <- graph_from_data_frame(tf.gene.df, directed = TRUE, vertices = NULL)
+  V(g)$color <- sapply(names(V(g)), function(x) {
+    if (x %in% tf.gene.df$TF) return("tomato")
+    else return("skyblue")
+  })
+  V(g)$size <- sapply(names(V(g)), function(x) {
+    if (x %in% tf.gene.df$TF) return(4)
+    else return(2)
+  })
+
+  if (label) {
+    labels <- names(V(g))
+  } else {
+    labels <- NA
+  }
+
+  l <- layout_with_fr(g)
+  plot.igraph(g, layout = l, vertex.size = V(g)$size, vertex.label = labels,
+              vertex.color = V(g)$color, edge.arrow.size = 0.1, main = plot.title,
+              vertex.label.cex = label.size)
+}
