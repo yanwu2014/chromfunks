@@ -1,5 +1,5 @@
 # chromfunks
-A R package designed to help with chromatin accessibility analysis
+A R package designed to help with chromatin accessibility analysis by building regulatory networks centered around noncoding accessible regions
 
 Installation instructions:
 
