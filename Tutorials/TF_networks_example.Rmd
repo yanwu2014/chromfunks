@@ -10,18 +10,22 @@ knitr::opts_chunk$set(echo = TRUE)
 options(bitmapType = "cairo")
 ```
 
-Single cell and bulk chromatin accessibility datasets have enabled scientists to study the noncoding regulatory genome with unprecedented resolution. However annotating the biological functions of these regions remains a challenge. Here we demonstrate a computational pipeline to building TF regulatory networks centered around specific noncoding regions, thus adding key biological context. Here, we demonstrate building TF regulatory networks centered around Human Accelerated Regions (HARs), where each TF regulates downstream genes via binding to one or more HARs.
+Single cell and bulk chromatin accessibility datasets have enabled scientists to study the noncoding regulatory genome with unprecedented resolution. However annotating the biological functions of these regions remains a challenge. Here we demonstrate a computational pipeline to building TF regulatory networks centered around specific noncoding regions, thus adding key biological context. We demonstrate building TF regulatory networks centered around Human Accelerated Regions (HARs), where each TF regulates downstream genes via binding to one or more HARs.
 
 
 First we need to download the [HARs](ftp://genome-miner.ucsd.edu/chromfunks_files/HAR_regions_hg38.bed), the single cell [chromatin accessibility](ftp://genome-miner.ucsd.edu/chromfunks_files/atac_counts_hg38_downsampled.RData) and [gene expression](ftp://genome-miner.ucsd.edu/chromfunks_files/atac_rna_downsampled.RData) datasets, and a [Hi-C dataset](ftp://genome-miner.ucsd.edu/chromfunks_files/RG.MAPS.peaks.txt) generated from sorted Radial Glia cells. The single cell datasets are downsampled from the cerebrum datasets from the [chromatin](https://science.sciencemag.org/content/370/6518/eaba7612) and [RNA](https://science.sciencemag.org/content/370/6518/eaba7721) fetal human cell atlases, and the Hi-C dataset comes from a [study of chromatin interaction](https://www.nature.com/articles/s41586-020-2825-4) from sorted fetal cortex cell types.
 
 
-We start the analysis by installing and/or loading the required libraries
+We start the analysis by installing and/or loading the required libraries. Uncomment the installation code to install packages.
 ```{r, message=FALSE, warning=FALSE}
 # BiocManager::install()
 # BiocManager::install(c("GenomicRanges", "ChIPseeker", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg38.knownGene", "motifmatchr", "chromVAR", "SummarizedExperiment", "BSgenome.Hsapiens.UCSC.hg38"))
+# install.packages("igraph")
+# devtools::install_github("yanwu2014/chromfunks")
+# devtools::install_github("yanwu2014/swne")
 
 library(chromfunks)
+library(swne)
 library(chromVAR)
 library(chromVARmotifs)
 library(SummarizedExperiment)
@@ -31,6 +35,7 @@ library(ChIPseeker)
 library(org.Hs.eg.db)
 library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 library(BSgenome.Hsapiens.UCSC.hg38)
+library(igraph)
 ```
 
 
@@ -72,6 +77,7 @@ head(har.regions)
 Now that we have all the datasets loaded and formatted, we can start making the networks. First we'll link TFs to HARs using the presence of TF motifs. The TFRegionLinks function also computes a correlation between the overall TF motif activity (as quantified using chromVAR) and the accessibility of HARs using the single cell accessibility dataset. The correlations are computed using binned accessibility counts to improve correlations, similar to how [Cicero](https://cole-trapnell-lab.github.io/cicero-release/) computes co-accessibility, with the bins computed using nearest neighbors in the UMAP space (although feel free to use any type of dimensional reduction here).
 ```{r, message=FALSE, warning=FALSE}
 ## Link ATAC TFs to regions using motifs and correlations
+register(MulticoreParam(8))
 tf.peak.df <- TFRegionLinks(atac.sampled.counts, atac.umap.emb[colnames(atac.sampled.counts),],
                             har.regions, n.cores = 8)
 head(tf.peak.df)
@@ -103,7 +109,20 @@ head(peak.gene.df)
 ```
 
 
-We can take advantage of our single cell datasets to ensure that the TFs and HARs are expressed/accessible in the relevant cell types. Since our Hi-C network was generated from Radial Glia (RG), we average our accessibility and expression datasets across cell types to identify regions and TFs that are accessible or expressed in Radial Glia.
+We can take advantage of our single cell datasets to ensure that the TFs are expressed in the relevant cell types. Since our Hi-C network was generated from Radial Glia (RG), we averaged across cell types to identify TFs that are expressed in Radial Glia.
+```{r, message=FALSE, warning=FALSE}
+## Find TFs expressed in Radial Glia
+atac.rna.avg.counts <- GetClusterAvg(atac.rna.counts, atac.rna.ident, binarize = T)
+hist(atac.rna.avg.counts)
+quantile(atac.rna.avg.counts)
+
+min.rna.cl.frac <- 0.025
+rg.expr <- atac.rna.avg.counts[,"RG"]
+rg.genes <- names(rg.expr[rg.expr > min.rna.cl.frac])
+```
+
+
+We also want to ensure that the HARs that link TFs to genes in our network are accessible in Radial Glia.
 ```{r, message=FALSE, warning=FALSE}
 ## Find peaks accessible in Radial Glia
 atac.avg.counts <- GetClusterAvg(LogTFIDF(atac.sampled.counts), atac.sampled.ident)
@@ -113,16 +132,8 @@ quantile(atac.avg.counts)
 min.cl.access <- 0.01
 rg.access <- atac.avg.counts[,"RG"]
 rg.peaks <- names(rg.access[rg.access > min.cl.access])
-
-## Find TFs expressed in Radial Glia
-atac.rna.avg.counts <- GetClusterAvg(atac.rna.counts, atac.rna.ident, binarize = T)
-hist(atac.avg.counts)
-quantile(atac.avg.counts)
-
-min.rna.cl.frac <- 0.025
-rg.expr <- atac.rna.avg.counts[,"RG"]
-rg.genes <- names(rg.expr[rg.expr > min.rna.cl.frac])
 ```
+
 
 We can then generate a TF to gene network where the TFs are expressed in Radial Glia and the HARs that link TFs to genes are accessible in Radial Glia. The SubsetLinks function returns a list of networks as dataframes, one for linking TFs to HARs, one for linking HARs to genes, and one for linking TFs to genes.
 ```{r, message=FALSE, warning=FALSE}
@@ -141,3 +152,21 @@ PlotNetwork(rg.networks$TF_gene_network)
 ```
 
 
+As you can see the network is quite large and interconnected, so let's try and identify some interesting biology to zoom in on. First, we want to find the TFs and genes that have the most influence on the network. For this, we can use the eigenvector centrality metric computed using the igraph package. Since we also want to look for genes that are highly interconnected as well, we choose to compute the undirected eigenvector centrality.
+```{r, message=FALSE, warning=FALSE}
+rg.graph <- graph_from_data_frame(rg.networks$TF_gene_network)
+node.centrality <- eigen_centrality(rg.graph, directed = F)
+node.centrality <- sort(node.centrality$vector, decreasing = T)
+ggBarplot(head(node.centrality, n = 10))
+```
+
+
+
+We can see that ZFHX4, zinc finger protein linked to intellectual disability and speech development is highly central in our Radial Glia network. Thus we zoom into a subnetwork of all genes within 2 degrees of separation of ZFHX4 to get a better sense of the specific genes/TFs involved.
+```{r, message=FALSE, warning=FALSE}
+tf.gene.df <- rg.networks$TF_gene_network
+
+ZFHX4.neighbors <- subset(tf.gene.df, TF == "ZFHX4" | gene == "ZFHX4")
+ZFHX4.network.df <- subset(tf.gene.df, gene %in% ZFHX4.neighbors$gene | TF %in% ZFHX4.neighbors$TF)
+PlotNetwork(ZFHX4.network.df, plot.title = "ZFHX4 Subnetwork", label = T)
+```

@@ -242,7 +242,6 @@ TFRegionLinks <- function(counts, embeddings, regions, bin.size = 50, n.cores = 
   motifs <- getJasparMotifs()
   motif.ix <- matchMotifs(motifs, bin.SE, genome = BSgenome.Hsapiens.UCSC.hg38)
 
-  register(MulticoreParam(n.cores))
   tf.dev <- computeDeviations(object = bin.SE, annotations = motif.ix)
   tf.z <- assays(tf.dev)[["z"]]
   rownames(tf.z) <- sapply(rownames(tf.z), extractField, 2)
