@@ -1,0 +1,143 @@
+---
+title: "Building Region-Centered TF Networks"
+author: "Yan Wu"
+date: "1/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(bitmapType = "cairo")
+```
+
+Single cell and bulk chromatin accessibility datasets have enabled scientists to study the noncoding regulatory genome with unprecedented resolution. However annotating the biological functions of these regions remains a challenge. Here we demonstrate a computational pipeline to building TF regulatory networks centered around specific noncoding regions, thus adding key biological context. Here, we demonstrate building TF regulatory networks centered around Human Accelerated Regions (HARs), where each TF regulates downstream genes via binding to one or more HARs.
+
+
+First we need to download the [HARs](ftp://genome-miner.ucsd.edu/chromfunks_files/HAR_regions_hg38.bed), the single cell [chromatin accessibility](ftp://genome-miner.ucsd.edu/chromfunks_files/atac_counts_hg38_downsampled.RData) and [gene expression](ftp://genome-miner.ucsd.edu/chromfunks_files/atac_rna_downsampled.RData) datasets, and a [Hi-C dataset](ftp://genome-miner.ucsd.edu/chromfunks_files/RG.MAPS.peaks.txt) generated from sorted Radial Glia cells. The single cell datasets are downsampled from the cerebrum datasets from the [chromatin](https://science.sciencemag.org/content/370/6518/eaba7612) and [RNA](https://science.sciencemag.org/content/370/6518/eaba7721) fetal human cell atlases, and the Hi-C dataset comes from a [study of chromatin interaction](https://www.nature.com/articles/s41586-020-2825-4) from sorted fetal cortex cell types.
+
+
+We start the analysis by installing and/or loading the required libraries
+```{r, message=FALSE, warning=FALSE}
+# BiocManager::install()
+# BiocManager::install(c("GenomicRanges", "ChIPseeker", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg38.knownGene", "motifmatchr", "chromVAR", "SummarizedExperiment", "BSgenome.Hsapiens.UCSC.hg38"))
+
+library(chromfunks)
+library(chromVAR)
+library(chromVARmotifs)
+library(SummarizedExperiment)
+library(motifmatchr)
+library(GenomicRanges)
+library(ChIPseeker)
+library(org.Hs.eg.db)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(BSgenome.Hsapiens.UCSC.hg38)
+```
+
+
+Here we load the chromatin and gene expression single cell datasets, filtering for chromatin peaks that are detected in at least 25 cells.
+```{r}
+## Load accessibility data
+load("../Data/atac_counts_hg38_downsampled.RData")
+dim(atac.sampled.counts)
+
+## Load RNA data
+load("../Data/atac_rna_downsampled.RData")
+dim(atac.rna.counts)
+
+## Filter peaks
+min.cells <- 25
+atac.sampled.counts <- atac.sampled.counts[rowSums(atac.sampled.counts) > min.cells,]
+atac.peaks <- atac.peaks[rownames(atac.sampled.counts)]
+dim(atac.sampled.counts)
+```
+
+
+We also need to load and format the Hi-C data and the Human Accelerated Regions (HARs)
+```{r}
+## Load Hi-C connections
+RG.conns <- read.table("../Data/RG.MAPS.peaks.txt", sep = "\t",
+                       header = T, stringsAsFactors = F)
+RG.conns$Peak1 <- paste0(RG.conns$chr1, ":", RG.conns$start1, "-", RG.conns$end1)
+RG.conns$Peak2 <- paste0(RG.conns$chr2, ":", RG.conns$start2, "-", RG.conns$end2)
+RG.conns <- RG.conns[,c("Peak1", "Peak2")]
+head(RG.conns)
+
+## Load HARs
+har.regions <- readPeakFile("../Data/HAR_regions_hg38.bed")
+names(har.regions) <- granges2peak(har.regions)
+head(har.regions)
+```
+
+
+Now that we have all the datasets loaded and formatted, we can start making the networks. First we'll link TFs to HARs using the presence of TF motifs. The TFRegionLinks function also computes a correlation between the overall TF motif activity (as quantified using chromVAR) and the accessibility of HARs using the single cell accessibility dataset. The correlations are computed using binned accessibility counts to improve correlations, similar to how [Cicero](https://cole-trapnell-lab.github.io/cicero-release/) computes co-accessibility, with the bins computed using nearest neighbors in the UMAP space (although feel free to use any type of dimensional reduction here).
+```{r, message=FALSE, warning=FALSE}
+## Link ATAC TFs to regions using motifs and correlations
+tf.peak.df <- TFRegionLinks(atac.sampled.counts, atac.umap.emb[colnames(atac.sampled.counts),],
+                            har.regions, n.cores = 8)
+head(tf.peak.df)
+```
+
+
+We can then filter links between TFs and HARs using a correlation cutoff. The idea here is that the presence of a TF motif in a genomic region doesn't necessarily mean the TF is bound to that region in a given cell type. By ensuring the overall activity of the TF correlates with the accessibility of the region, we at least know that the TF and the region are active in the same cell types.
+```{r, message=FALSE, warning=FALSE}
+## Filter TF - region links using a correlation cutoff
+hist(tf.peak.df$cor)
+quantile(tf.peak.df$cor, na.rm = T)
+nrow(tf.peak.df)
+
+min.cor <- 0.1
+tf.peak.df <- subset(tf.peak.df, cor > min.cor)
+nrow(tf.peak.df)
+```
+
+
+Next we link HARs to downstream genes using the Hi-C dataset. We link an HAR to a gene if the HAR is in contact with a peak within 3 kb of the gene's transcription start site.
+```{r, message=FALSE, warning=FALSE}
+## Link ATAC HAR/HGE peaks to genes
+har.peaks.ix <- findOverlaps(har.regions, atac.peaks)
+har.peaks <- atac.peaks[unique(har.peaks.ix@to)]
+peak.gene.df <- RegionGeneLinks(har.peaks, RG.conns, link.promoter = T,
+                                promoter.region = c(-3e3, 3e3),
+                                region.name = NULL, weight.col = NULL)
+head(peak.gene.df)
+```
+
+
+We can take advantage of our single cell datasets to ensure that the TFs and HARs are expressed/accessible in the relevant cell types. Since our Hi-C network was generated from Radial Glia (RG), we average our accessibility and expression datasets across cell types to identify regions and TFs that are accessible or expressed in Radial Glia.
+```{r, message=FALSE, warning=FALSE}
+## Find peaks accessible in Radial Glia
+atac.avg.counts <- GetClusterAvg(LogTFIDF(atac.sampled.counts), atac.sampled.ident)
+hist(atac.avg.counts)
+quantile(atac.avg.counts)
+
+min.cl.access <- 0.01
+rg.access <- atac.avg.counts[,"RG"]
+rg.peaks <- names(rg.access[rg.access > min.cl.access])
+
+## Find TFs expressed in Radial Glia
+atac.rna.avg.counts <- GetClusterAvg(atac.rna.counts, atac.rna.ident, binarize = T)
+hist(atac.avg.counts)
+quantile(atac.avg.counts)
+
+min.rna.cl.frac <- 0.025
+rg.expr <- atac.rna.avg.counts[,"RG"]
+rg.genes <- names(rg.expr[rg.expr > min.rna.cl.frac])
+```
+
+We can then generate a TF to gene network where the TFs are expressed in Radial Glia and the HARs that link TFs to genes are accessible in Radial Glia. The SubsetLinks function returns a list of networks as dataframes, one for linking TFs to HARs, one for linking HARs to genes, and one for linking TFs to genes.
+```{r, message=FALSE, warning=FALSE}
+## Subset to HARs accessible in RG and TFs expressed in RG
+rg.networks <- SubsetLinks(tf.peak.df, peak.gene.df, regions = rg.peaks, tfs = rg.genes)
+sapply(rg.networks, nrow)
+
+head(rg.networks$TF_gene_network)
+```
+
+
+Finally we can plot our HAR-centered TF regulatory network that is also specific to Radial Glia cells. The red nodes indicate TFs and the smaller blue nodes are genes.
+```{r, message=FALSE, warning=FALSE}
+## Plot RG network
+PlotNetwork(rg.networks$TF_gene_network)
+```
+
+
