@@ -217,6 +217,7 @@ unflattenVec <- function(v, delim = "_") {
 #' @export
 #'
 getPseudobulk <- function(mat, celltype) {
+  celltype <- celltype[!is.na(celltype)]
   mat.summary <- do.call(cbind, lapply(levels(celltype), function(ct) {
     cells <- names(celltype)[celltype == ct]
     pseudobulk <- Matrix::rowSums(mat[,cells])
